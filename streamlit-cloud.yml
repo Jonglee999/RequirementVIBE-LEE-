@@ -1,0 +1,44 @@
+# Streamlit Cloud Configuration
+# Note: Streamlit Cloud primarily uses the web UI for configuration,
+# but this file documents the app configuration for reference.
+
+app:
+  name: "ReqVibe - AI Requirements Analyst"
+  main_file: "app.py"
+  python_version: "3.9"
+  
+environment:
+  variables:
+    - name: DEEPSEEK_API_KEY
+      description: "DeepSeek API key for AI requirements analysis"
+      required: true
+      # Set this in Streamlit Cloud Secrets (not in this file!)
+
+dependencies:
+  file: "requirements.txt"
+  packages:
+    - streamlit>=1.28.0
+    - openai>=1.0.0  # Required for DeepSeek API (OpenAI-compatible SDK)
+
+configuration:
+  theme:
+    primaryColor: "#1f77b4"
+    backgroundColor: "#ffffff"
+    secondaryBackgroundColor: "#f0f2f6"
+    textColor: "#262730"
+  
+  server:
+    headless: true
+    enableCORS: false
+    enableXsrfProtection: true
+
+# Deployment Instructions:
+# 1. Push your code to GitHub
+# 2. Go to https://share.streamlit.io/
+# 3. Connect your GitHub repository
+# 4. Set main file to: app.py
+# 5. Add DEEPSEEK_API_KEY in Secrets section
+# 6. Deploy!
+
+# For detailed instructions, see DEPLOYMENT.md
+
