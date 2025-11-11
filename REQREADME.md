@@ -1,10 +1,14 @@
-<<<<<<< HEAD
-# RequirementVIBE
-This is a requirementVIBE chating paradigm to Requirement Engineering 
-=======
 # ReqVibe - AI Requirements Analyst
 
 A Streamlit application that uses DeepSeek API to analyze and refine software requirements.
+
+## Character Card
+
+**This is the DNA of ReqVibe — all behavior comes from here.**
+
+The `character_card.json` file defines ReqVibe's personality, expertise, and interaction style. This configuration file ensures consistent, professional requirements engineering assistance following industry standards like Volere and IEEE 830.
+
+See `character_card.json` for the complete character definition.
 
 ## Setup
 
@@ -33,7 +37,6 @@ export DEEPSEEK_API_KEY=YOUR_API_KEY
 **Note:** The environment variable is set only for the current terminal session. To make it permanent, you can:
 - Add it to your system environment variables (Windows)
 - Add it to your `~/.bashrc` or `~/.zshrc` file (Linux/Mac)
-- Or run the setup script: `.\setup.ps1` (Windows PowerShell)
 
 ## Running the App
 
@@ -88,5 +91,3 @@ For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 - ✅ Real-time API responses with loading indicators
 - ✅ Clear conversation functionality
 - ✅ Responsive UI with Streamlit chat interface
-
->>>>>>> 655292d (The first version of ReqVIBE!)

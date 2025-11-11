@@ -3,23 +3,56 @@ import os
 from openai import OpenAI  # DeepSeek API uses OpenAI-compatible SDK
 import uuid
 from datetime import datetime
+from memory import ShortTermMemory
 
 # Set page title and configuration
 st.set_page_config(
-    page_title="ReqVibe - AI Requirements Analyst",
+    page_title="Requirement Auto Analysis:UESTC-MBSE Requirement Assistant",
     page_icon="📋",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded"  # Start with sidebar expanded, but user can collapse it
 )
 
 # Custom CSS for ChatGPT-like dark theme
 st.markdown("""
 <style>
     /* Hide Streamlit default elements */
-    #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
     .stDeployButton {visibility: hidden;}
+    
+    /* Keep header visible for sidebar toggle */
+    header {
+        visibility: visible !important;
+        display: block !important;
+        height: 3.5rem !important;
+        background-color: #202123 !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        z-index: 100;
+    }
+    
+    /* Ensure header buttons are visible and styled */
+    header button,
+    [data-testid="stHeader"] button,
+    button[data-testid="baseButton-header"] {
+        visibility: visible !important;
+        display: inline-block !important;
+        background-color: transparent !important;
+        border: 1px solid #565869 !important;
+        color: #ececf1 !important;
+        border-radius: 4px;
+        padding: 0.4rem 0.6rem;
+        cursor: pointer;
+    }
+    
+    header button:hover,
+    [data-testid="stHeader"] button:hover {
+        background-color: #343541 !important;
+    }
+    
+    /* Ensure MainMenu is accessible */
+    #MainMenu {
+        visibility: visible !important;
+    }
     
     /* Main app background */
     .stApp {
@@ -28,15 +61,31 @@ st.markdown("""
     
     /* Main container styling */
     .main .block-container {
-        padding-top: 2rem;
+        padding-top: 4rem;
         padding-bottom: 6rem;
+        padding-left: 1rem;
         max-width: 900px;
         margin: 0 auto;
+    }
+    
+    /* Add space for the menu button */
+    @media (min-width: 768px) {
+        .main .block-container {
+            padding-left: 2rem;
+        }
     }
     
     /* Sidebar styling */
     section[data-testid="stSidebar"] {
         background-color: #202123 !important;
+        z-index: 1000 !important;
+    }
+    
+    /* Ensure sidebar is visible when expanded */
+    section[data-testid="stSidebar"][aria-expanded="true"],
+    section[data-testid="stSidebar"]:not([aria-expanded="false"]) {
+        display: flex !important;
+        visibility: visible !important;
     }
     
     section[data-testid="stSidebar"] > div {
@@ -252,10 +301,26 @@ if "current_session_id" not in st.session_state:
     st.session_state.current_session_id = None
 if "session_counter" not in st.session_state:
     st.session_state.session_counter = 0
+if "generated_srs" not in st.session_state:
+    st.session_state.generated_srs = None
+if "srs_generation_error" not in st.session_state:
+    st.session_state.srs_generation_error = None
+
+# Initialize memory (per session)
+if "memory" not in st.session_state:
+    st.session_state.memory = ShortTermMemory()
 
 # Create new session
 def create_new_session():
     session_id = str(uuid.uuid4())
+    # Save current memory to previous session if it exists
+    if st.session_state.current_session_id and st.session_state.current_session_id in st.session_state.sessions:
+        # Save memory messages to previous session before switching
+        prev_session = st.session_state.sessions[st.session_state.current_session_id]
+        prev_session["messages"] = st.session_state.memory.get_messages()
+        st.session_state.sessions[st.session_state.current_session_id] = prev_session
+    
+    # Create new session
     st.session_state.sessions[session_id] = {
         "id": session_id,
         "messages": [],
@@ -264,13 +329,20 @@ def create_new_session():
     }
     st.session_state.session_counter += 1
     st.session_state.current_session_id = session_id
+    # Reset memory for new session
+    st.session_state.memory = ShortTermMemory()
+    # Clear generated SRS when creating new session
+    st.session_state.generated_srs = None
+    st.session_state.srs_generation_error = None
     return session_id
 
 # Get current session
 def get_current_session():
     if st.session_state.current_session_id is None:
         create_new_session()
-    return st.session_state.sessions[st.session_state.current_session_id]
+    
+    session = st.session_state.sessions[st.session_state.current_session_id]
+    return session
 
 # Update session title from first user message
 def update_session_title(session_id, first_message):
@@ -281,6 +353,96 @@ def update_session_title(session_id, first_message):
             if len(first_message) > 50:
                 title += "..."
             st.session_state.sessions[session_id]["title"] = title
+
+# Generate IEEE 830 SRS from assistant messages using API
+def generate_ieee830_srs_from_conversation(client, assistant_messages):
+    """
+    Generate IEEE 830 SRS format from all assistant messages using API.
+    
+    Args:
+        client: OpenAI-compatible API client (DeepSeek)
+        assistant_messages: List of assistant message strings
+    
+    Returns:
+        str: IEEE 830 formatted SRS document in Markdown
+    """
+    if not assistant_messages:
+        return "# Software Requirements Specification (IEEE 830)\n\n## 1. Introduction\n\nNo requirements have been captured yet. Please start a conversation with the AI assistant to analyze and capture requirements."
+    
+    # Combine all assistant messages into a single context
+    conversation_context = "\n\n---\n\n".join([
+        f"**Assistant Response {i+1}:**\n{msg}" 
+        for i, msg in enumerate(assistant_messages)
+    ])
+    
+    # Create prompt for API to format into IEEE 830 SRS
+    system_prompt = """You are a professional requirements engineer. Your task is to analyze the conversation history (specifically the assistant's responses) and generate a complete Software Requirements Specification (SRS) document following the IEEE 830 standard format.
+
+The IEEE 830 SRS structure should include:
+1. Introduction
+   1.1 Purpose
+   1.2 Scope
+   1.3 Definitions, Acronyms, and Abbreviations
+   1.4 References
+   1.5 Overview
+2. Overall Description
+   2.1 Product Perspective
+   2.2 Product Functions
+   2.3 User Characteristics
+   2.4 Constraints
+   2.5 Assumptions and Dependencies
+3. Specific Requirements
+   3.1 Functional Requirements
+   3.2 Non-Functional Requirements
+   3.3 Interface Requirements
+   3.4 Performance Requirements
+   3.5 Design Constraints
+
+Extract all requirements mentioned in the assistant responses. For each requirement, include:
+- Requirement ID (REQ-XXX format if available)
+- Requirement description
+- Priority (if mentioned)
+- Dependencies (if mentioned)
+- Acceptance criteria (if mentioned)
+
+Format the output as a well-structured Markdown document following IEEE 830 standards. Be comprehensive and organized."""
+
+    user_prompt = f"""Please analyze the following assistant responses from a requirements engineering conversation and generate a complete IEEE 830 SRS document in Markdown format.
+
+**Conversation History (Assistant Responses Only):**
+
+{conversation_context}
+
+**Instructions:**
+- Extract all requirements, functional and non-functional
+- Organize them according to IEEE 830 SRS structure
+- Include all requirement IDs (REQ-XXX) if present
+- Include Volere fields (Goal, Context, Stakeholder) if mentioned
+- Be comprehensive and well-structured
+- Use proper Markdown formatting with headers, lists, and tables where appropriate
+
+Generate the complete SRS document now:"""
+    
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.3,  # Lower temperature for more consistent, structured output
+            max_tokens=4000  # Allow for comprehensive SRS document
+        )
+        
+        srs_content = response.choices[0].message.content
+        
+        # Ensure it starts with a proper header if not already present
+        if not srs_content.startswith("#"):
+            srs_content = "# Software Requirements Specification (IEEE 830)\n\n" + srs_content
+        
+        return srs_content
+    except Exception as e:
+        raise Exception(f"Failed to generate SRS from API: {str(e)}")
 
 # Sidebar - Session Management
 with st.sidebar:
@@ -321,19 +483,352 @@ with st.sidebar:
                 use_container_width=True,
                 type=button_type
             ):
+                # Save current memory to previous session before switching
+                if st.session_state.current_session_id and st.session_state.current_session_id in st.session_state.sessions:
+                    prev_session = st.session_state.sessions[st.session_state.current_session_id]
+                    prev_session["messages"] = st.session_state.memory.get_messages()
+                    st.session_state.sessions[st.session_state.current_session_id] = prev_session
+                
+                # Switch to selected session
                 st.session_state.current_session_id = session_id
+                # Load selected session's messages into memory
+                selected_session = st.session_state.sessions[session_id]
+                st.session_state.memory.load_messages(selected_session["messages"], reset=True)
+                # Clear generated SRS when switching sessions (since it's session-specific)
+                st.session_state.generated_srs = None
+                st.session_state.srs_generation_error = None
                 st.rerun()
     
     st.markdown("<div style='margin-top: 2rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
+    
+    # Export SRS section (always visible button, no status message before click)
+    if st.button("📄 Export SRS (Markdown)", use_container_width=True, type="secondary", help="Generate and download IEEE 830 SRS document from conversation"):
+        # Check if we have assistant messages
+        all_messages = st.session_state.memory.get_messages(include_system=False)
+        assistant_messages = [msg["content"] for msg in all_messages if msg.get("role") == "assistant"]
+        
+        if not assistant_messages:
+            st.warning("⚠️ No assistant responses found in the conversation. Please start a conversation and receive responses from the AI before exporting SRS.")
+            st.session_state.generated_srs = None
+            st.session_state.srs_generation_error = "No assistant messages found"
+        else:
+            # Generate SRS using API
+            try:
+                client = get_deepseek_client()
+                if client:
+                    with st.spinner("🔄 Generating IEEE 830 SRS document from conversation..."):
+                        srs_content = generate_ieee830_srs_from_conversation(client, assistant_messages)
+                        st.session_state.generated_srs = srs_content
+                        st.session_state.srs_generation_error = None
+                        st.success("✅ SRS document generated successfully! Use the download button below to save it.")
+                else:
+                    st.error("❌ Unable to connect to API. Please check your API key configuration.")
+                    st.session_state.generated_srs = None
+                    st.session_state.srs_generation_error = "API connection failed"
+            except Exception as e:
+                error_msg = f"❌ Error generating SRS: {str(e)}"
+                st.error(error_msg)
+                st.session_state.generated_srs = None
+                st.session_state.srs_generation_error = str(e)
+    
+    # Show download button if SRS has been generated
+    if st.session_state.generated_srs:
+        st.download_button(
+            label="💾 Download SRS Document",
+            data=st.session_state.generated_srs,
+            file_name="srs_ieee830.md",
+            mime="text/markdown",
+            use_container_width=True,
+            type="primary",
+            help="Download the generated IEEE 830 SRS document"
+        )
+    elif st.session_state.srs_generation_error:
+        # Show error state - allow retry
+        st.info("ℹ️ Click the 'Export SRS (Markdown)' button above to generate the SRS document.")
+    
+    # Summarize Context button (always visible, no status message before click)
+    if st.button("📝 Summarize Context", use_container_width=True, type="secondary", help="Summarize old messages to reduce token usage"):
+        # Check conditions after button click
+        history_length = st.session_state.memory.get_history_length()
+        has_session = st.session_state.current_session_id is not None
+        
+        # Check if already summarized by checking system messages
+        all_messages_with_system = st.session_state.memory.get_messages(include_system=True)
+        has_summary = any(
+            msg.get("role") == "system" and msg.get("content", "").startswith("SUMMARY:") 
+            for msg in all_messages_with_system
+        )
+        
+        if not has_session:
+            st.warning("⚠️ No active session found. Please start a conversation first.")
+        elif history_length <= 10:
+            st.warning(f"⚠️ Summarization requires more than 10 messages in the conversation history. Currently, you have {history_length} message(s). Please continue the conversation to enable this feature.")
+        elif has_summary:
+            st.info("ℹ️ This conversation has already been summarized. You can continue chatting, and when you have more than 10 new messages, you can summarize again.")
+        else:
+            # Conditions met, perform summarization
+            try:
+                client = get_deepseek_client()
+                if client:
+                    with st.spinner("Summarizing conversation..."):
+                        success = st.session_state.memory.summarize_old_messages(client)
+                        if success:
+                            # Update session messages from memory (exclude system messages for display)
+                            current_session = get_current_session()
+                            current_session["messages"] = st.session_state.memory.get_messages(include_system=False)
+                            st.session_state.sessions[st.session_state.current_session_id] = current_session
+                            st.success("✅ Context summarized successfully! Old messages have been condensed.")
+                            st.rerun()
+                        else:
+                            # Check why it failed
+                            if has_summary:
+                                st.info("ℹ️ This conversation has already been summarized. Continue chatting to add more messages before summarizing again.")
+                            elif history_length <= 10:
+                                st.warning(f"⚠️ Summarization requires more than 10 messages. Currently: {history_length} message(s).")
+                            else:
+                                st.error("❌ Failed to summarize context. Please try again or check your API connection.")
+                else:
+                    st.error("❌ Unable to connect to API. Please check your API key configuration.")
+            except Exception as e:
+                st.error(f"❌ Error summarizing context: {str(e)}")
     
     # Clear current session button
     if st.session_state.current_session_id and len(get_current_session()["messages"]) > 0:
         if st.button("🗑️ Clear Current Chat", use_container_width=True, type="secondary"):
             if st.session_state.current_session_id in st.session_state.sessions:
                 st.session_state.sessions[st.session_state.current_session_id]["messages"] = []
+            # Clear memory
+            st.session_state.memory.clear_chat_history()
+            # Clear generated SRS when clearing chat
+            st.session_state.generated_srs = None
+            st.session_state.srs_generation_error = None
             st.rerun()
     
     st.markdown("</div>", unsafe_allow_html=True)
+
+# Add sidebar toggle button in top left corner (fixed position)
+st.markdown("""
+<div id="sidebarToggleContainer" style='position: fixed; top: 10px; left: 10px; z-index: 9999;'>
+    <button id="sidebarToggleBtn" style='
+        background-color: #202123;
+        color: #ececf1;
+        border: 1px solid #565869;
+        border-radius: 6px;
+        padding: 0.6rem 1rem;
+        cursor: pointer;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        transition: all 0.2s;
+        font-weight: 500;
+    '>
+        <span style='font-size: 1.2rem;'>☰</span> <span>Menu</span>
+    </button>
+</div>
+
+<script>
+(function() {
+    const btn = document.getElementById('sidebarToggleBtn');
+    if (!btn) return;
+    
+    function findSidebarToggle() {
+        // Try multiple selectors to find Streamlit's sidebar toggle button
+        const selectors = [
+            'button[data-testid="baseButton-header"]',
+            '[data-testid="stHeader"] button',
+            '[data-testid="stHeader"] button:first-child',
+            'button[kind="header"]',
+            '.stApp > header button',
+            'header button:first-child'
+        ];
+        
+        for (const selector of selectors) {
+            const buttons = document.querySelectorAll(selector);
+            for (const button of buttons) {
+                if (button.offsetWidth > 0 && button.offsetHeight > 0) {
+                    return button;
+                }
+            }
+        }
+        
+        // Fallback: find any button in header area
+        const header = document.querySelector('[data-testid="stHeader"]') || 
+                       document.querySelector('header') ||
+                       document.querySelector('.stApp > div:first-child');
+        if (header) {
+            const buttons = header.querySelectorAll('button');
+            if (buttons.length > 0) {
+                return buttons[0];
+            }
+        }
+        
+        return null;
+    }
+    
+    function toggleSidebar() {
+        console.log('Toggle sidebar clicked');
+        
+        // Strategy 1: Try to find and click Streamlit's native toggle button
+        let toggleBtn = findSidebarToggle();
+        if (toggleBtn) {
+            console.log('Found native toggle button, clicking...');
+            try {
+                // Create a proper click event
+                const clickEvent = new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true,
+                    buttons: 1
+                });
+                toggleBtn.dispatchEvent(clickEvent);
+                
+                // Also try native click method
+                if (typeof toggleBtn.click === 'function') {
+                    toggleBtn.click();
+                }
+                
+                // Give it a moment, then check if it worked
+                setTimeout(function() {
+                    const sidebar = document.querySelector('section[data-testid="stSidebar"]');
+                    if (sidebar) {
+                        const isExpanded = sidebar.getAttribute('aria-expanded') === 'true' || sidebar.offsetWidth > 100;
+                        if (!isExpanded) {
+                            console.log('Native click did not work, trying direct manipulation...');
+                            expandSidebarDirectly();
+                        }
+                    }
+                }, 200);
+                return;
+            } catch (e) {
+                console.log('Error clicking native toggle:', e);
+            }
+        }
+        
+        // Strategy 2: Direct sidebar manipulation
+        expandSidebarDirectly();
+    }
+    
+    function expandSidebarDirectly() {
+        const sidebar = document.querySelector('section[data-testid="stSidebar"]');
+        if (!sidebar) {
+            console.log('Sidebar not found');
+            return;
+        }
+        
+        console.log('Expanding sidebar directly...');
+        const currentState = sidebar.getAttribute('aria-expanded');
+        const computedStyle = window.getComputedStyle(sidebar);
+        const isVisible = computedStyle.display !== 'none' && sidebar.offsetWidth > 50;
+        
+        if (currentState !== 'true' || !isVisible) {
+            // Force expand sidebar
+            sidebar.setAttribute('aria-expanded', 'true');
+            sidebar.style.setProperty('display', 'flex', 'important');
+            sidebar.style.setProperty('visibility', 'visible', 'important');
+            sidebar.style.setProperty('transform', 'translateX(0)', 'important');
+            sidebar.style.setProperty('opacity', '1', 'important');
+            
+            // Ensure sidebar content is visible
+            const sidebarContent = sidebar.querySelector('[data-testid="stSidebarContent"]');
+            if (sidebarContent) {
+                sidebarContent.style.setProperty('display', 'block', 'important');
+                sidebarContent.style.setProperty('visibility', 'visible', 'important');
+            }
+            
+            // Trigger resize events for Streamlit
+            window.dispatchEvent(new Event('resize'));
+            setTimeout(function() {
+                window.dispatchEvent(new Event('resize'));
+            }, 100);
+            
+            console.log('Sidebar expanded');
+        }
+    }
+    
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSidebar();
+    });
+    
+    btn.addEventListener('mouseenter', function() {
+        this.style.backgroundColor = '#343541';
+    });
+    
+    btn.addEventListener('mouseleave', function() {
+        this.style.backgroundColor = '#202123';
+    });
+    
+    // Initialize: Check sidebar state on load
+    setTimeout(function() {
+        const sidebar = document.querySelector('section[data-testid="stSidebar"]');
+        if (sidebar) {
+            const isCollapsed = sidebar.getAttribute('aria-expanded') === 'false' || 
+                               sidebar.offsetWidth < 50;
+            console.log('Sidebar state on load:', isCollapsed ? 'collapsed' : 'expanded');
+            
+            // If sidebar is collapsed, ensure button is visible
+            if (isCollapsed) {
+                const btn = document.getElementById('sidebarToggleBtn');
+                if (btn) {
+                    btn.style.display = 'flex';
+                }
+            }
+        }
+    }, 500);
+    
+    // Retry finding elements after Streamlit finishes loading
+    setTimeout(function() {
+        // Re-initialize in case DOM changed
+        const btn = document.getElementById('sidebarToggleBtn');
+        if (btn && !btn.onclick) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleSidebar();
+            });
+        }
+    }, 1000);
+})();
+</script>
+
+<style>
+/* Ensure the toggle button is always visible and on top */
+#sidebarToggleContainer {
+    position: fixed !important;
+    top: 10px !important;
+    left: 10px !important;
+    z-index: 9999 !important;
+    pointer-events: auto !important;
+}
+
+#sidebarToggleBtn {
+    position: relative !important;
+    z-index: 10000 !important;
+    pointer-events: auto !important;
+}
+
+#sidebarToggleBtn:hover {
+    background-color: #343541 !important;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+/* Ensure sidebar is accessible */
+section[data-testid="stSidebar"] {
+    z-index: 1000 !important;
+}
+
+/* Make sure main content doesn't overlap the button on small screens */
+@media (max-width: 768px) {
+    .main .block-container {
+        padding-top: 4rem;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Input area at bottom - placed before message display for better UX
 user_input = st.chat_input("Ask for requirement analysis...")
@@ -341,27 +836,33 @@ user_input = st.chat_input("Ask for requirement analysis...")
 # Main Chat Area
 current_session = get_current_session()
 
+# On first load, if session has messages but memory is empty, load them
+# (This handles the case where the page reloads and memory is reset but session persists)
+if current_session["messages"] and st.session_state.memory.get_history_length() == 0:
+    st.session_state.memory.load_messages(current_session["messages"], reset=True)
+
 # Handle user input
 if user_input:
-    # Add user message to current session
-    current_session["messages"].append({"role": "user", "content": user_input})
+    # Add user message to memory
+    st.session_state.memory.add_message("user", user_input)
     
     # Update session title if it's the first message
-    if len(current_session["messages"]) == 1:
+    if st.session_state.memory.get_history_length() == 1:
         update_session_title(st.session_state.current_session_id, user_input)
-    
-    # Update session in state
-    st.session_state.sessions[st.session_state.current_session_id] = current_session
 
-# Get updated messages
-messages = current_session["messages"]
+# Get messages from memory for display (memory is source of truth)
+messages = st.session_state.memory.get_messages()
+# Sync session messages from memory (only update if changed)
+if current_session["messages"] != messages:
+    current_session["messages"] = messages
+    st.session_state.sessions[st.session_state.current_session_id] = current_session
 
 # Display welcome message if no messages
 if len(messages) == 0:
     st.markdown("""
     <div style='text-align: center; padding: 4rem 1rem 2rem 1rem; max-width: 700px; margin: 0 auto;'>
         <h1 style='color: #ececf1; font-size: 2.75rem; font-weight: 600; margin-bottom: 1.5rem; line-height: 1.2;'>What are you working on?</h1>
-        <p style='color: #8e8ea0; font-size: 1.1rem; line-height: 1.6; margin: 0;'>Ask ReqVibe to help you analyze and refine your software requirements using Volere template structure.</p>
+        <p style='color: #8e8ea0; font-size: 1.1rem; line-height: 1.6; margin: 0;'>Ask MBSE ReqViber to help you analyze and refine your software requirements using Volere template structure.</p>
     </div>
     """, unsafe_allow_html=True)
 else:
@@ -375,10 +876,17 @@ if user_input:
     try:
         client = get_deepseek_client()
         
-        # Prepare messages with system prompt and full conversation history
-        system_prompt = "You are ReqVibe, a professional requirements engineer. Use Volere template structure."
+        # Prepare messages with system prompt and context from memory (with token management)
+        system_prompt = "You are ReqViber, a professional requirements engineer. Use Volere template structure."
+        
+        # Get context from memory (automatically manages token limit, may trigger summarization)
+        # Pass client for optional auto-summarization when tokens are high
+        context_messages = st.session_state.memory.get_context_for_api(max_tokens=3500, client=client)
+        
+        # Build API messages: system prompt + context
+        # Context messages may include system messages (like summaries) and conversation messages
         api_messages = [{"role": "system", "content": system_prompt}]
-        api_messages.extend(current_session["messages"])
+        api_messages.extend(context_messages)
         
         # Show loading indicator and get AI response
         with st.chat_message("assistant"):
@@ -393,18 +901,16 @@ if user_input:
                 ai_response = response.choices[0].message.content
                 st.markdown(ai_response)
         
-        # Add AI response to session
-        current_session["messages"].append({"role": "assistant", "content": ai_response})
-        
-        # Update session in state
-        st.session_state.sessions[st.session_state.current_session_id] = current_session
+        # Add AI response to memory
+        st.session_state.memory.add_message("assistant", ai_response)
         st.rerun()
         
     except Exception as e:
         error_msg = f"Sorry, an error occurred: {str(e)}"
         with st.chat_message("assistant"):
             st.error(error_msg)
-        current_session["messages"].append({"role": "assistant", "content": error_msg})
-        st.session_state.sessions[st.session_state.current_session_id] = current_session
+        
+        # Add error message to memory
+        st.session_state.memory.add_message("assistant", error_msg)
         st.rerun()
 
