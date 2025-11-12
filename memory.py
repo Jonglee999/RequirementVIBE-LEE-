@@ -153,11 +153,40 @@ class ShortTermMemory:
     def add_requirement(self, requirement: Dict[str, Any]) -> None:
         """
         Add a requirement to the requirements list.
+        Also saves to long-term memory (LTM) if auto-save is enabled.
         
         Args:
             requirement: Requirement dictionary with 'id', 'text', 'volere' keys
         """
         self.requirements.append(requirement)
+        
+        # Auto-save to long-term memory if enabled
+        # Check if LTM auto-save is enabled in session state (default: True)
+        auto_save_enabled = st.session_state.get("ltm_auto_save", True)
+        
+        if auto_save_enabled and "ltm" in st.session_state:
+            try:
+                # Extract requirement data for LTM storage
+                req_id = requirement.get("id", "")
+                req_text = requirement.get("text", "")
+                req_volere = requirement.get("volere", {})
+                
+                # Get current project name from session state (default: "default")
+                current_project = st.session_state.get("current_project", "default")
+                
+                # Save to long-term memory with metadata
+                st.session_state.ltm.save(
+                    req_id=req_id,
+                    text=req_text,
+                    metadata={
+                        "project": current_project,
+                        "volere": req_volere
+                    }
+                )
+            except Exception as e:
+                # Silently fail if LTM save fails (don't interrupt requirement storage)
+                # In production, you might want to log this error
+                pass
     
     def get_requirements(self) -> List[Dict[str, Any]]:
         """
