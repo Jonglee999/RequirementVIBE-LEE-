@@ -260,7 +260,7 @@ class ShortTermMemory:
         
         return total_tokens
     
-    def get_context_for_api(self, max_tokens: int = 3500, client=None) -> List[Dict[str, str]]:
+    def get_context_for_api(self, max_tokens: int = 3500, client=None, model: str = "deepseek-chat") -> List[Dict[str, str]]:
         """
         Get context for API call with token limit management.
         
@@ -291,7 +291,7 @@ class ShortTermMemory:
         summarization_performed = False
         if total_tokens > max_tokens and client is not None and len(self.chat_history) > 10:
             # Try to summarize old messages to reduce token count
-            if self.summarize_old_messages(client):
+            if self.summarize_old_messages(client, model=model):
                 summarization_performed = True
                 # After summarization, recalculate with system messages included
                 # (summary is stored as a system message)
@@ -360,7 +360,7 @@ class ShortTermMemory:
         # Return system messages + recent non-system messages
         return system_messages + recent_messages
     
-    def summarize_old_messages(self, client) -> bool:
+    def summarize_old_messages(self, client, model: str = "deepseek-chat") -> bool:
         """
         Summarize old messages if chat history has more than 10 messages.
         
@@ -413,7 +413,7 @@ Conversation:
 """ + conversation_text
             
             response = client.chat.completions.create(
-                model="deepseek-chat",
+                model=model,
                 messages=[
                     {"role": "system", "content": "You are a requirements engineering assistant. Summarize conversations concisely while preserving all requirement IDs and key information."},
                     {"role": "user", "content": summarization_prompt}
