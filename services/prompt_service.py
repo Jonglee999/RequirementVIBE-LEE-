@@ -1,4 +1,6 @@
 """
+Prompt Service for ReqVibe
+
 Character prompt rendering utilities for ReqVibe.
 Loads and renders Jinja2 templates from the prompts directory.
 """
@@ -45,7 +47,9 @@ def load_character_card() -> CharacterCard:
         ValidationError: If the JSON doesn't match the expected structure
     """
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    character_card_path = os.path.join(current_dir, "character_card.json")
+    # Go up one level to project root (from services/prompt_service.py to RequirenebtVIBE/)
+    project_root = os.path.dirname(current_dir)
+    character_card_path = os.path.join(project_root, "character_card.json")
     
     with open(character_card_path, 'r', encoding='utf-8') as f:
         character_data = json.load(f)
@@ -169,11 +173,12 @@ def render_prompt(template_name, context_dict):
         >>> context = {"character": {"name": "ReqVibe", "role": "Consultant"}}
         >>> prompt = render_prompt("base", context)
     """
-    # Get the directory where this script is located
+    # Get the directory where this script is located (services/prompt_service.py)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # Set up the templates directory path
-    templates_dir = os.path.join(current_dir, "prompts")
+    # Go up one level to project root (RequirenebtVIBE/), then into 'prompts'
+    project_root = os.path.dirname(current_dir)
+    templates_dir = os.path.join(project_root, "prompts")
     
     # Create Jinja2 environment with the templates directory
     env = Environment(
@@ -555,68 +560,3 @@ def decide_and_build_prompt(
     messages.append({"role": "user", "content": user_message})
     
     return messages, conflict_message, new_requirement_data
-
-
-# Example usage (for testing)
-if __name__ == "__main__":
-    # Test loading character card
-    try:
-        character_card = load_character_card()
-        print(f"Character card loaded: {character_card.name}")
-    except Exception as e:
-        print(f"Error loading character card: {e}")
-    
-    # Test requirement phrase detection
-    test_messages = [
-        "I need a login system",
-        "Hello, how are you?",
-        "The system should allow users to register",
-        "What is requirements engineering?"
-    ]
-    
-    print("\nTesting requirement phrase detection:")
-    for msg in test_messages:
-        is_req = contains_requirement_phrase(msg)
-        print(f"  '{msg}' -> {is_req}")
-    
-    # Test REQ-ID generation
-    print("\nTesting REQ-ID generation:")
-    test_requirements = [
-        {"id": "REQ-001", "text": "Login system", "volere": {"goal": "Auth", "context": "Web", "stakeholder": "Users"}},
-        {"id": "REQ-002", "text": "Password validation", "volere": {"goal": "Security", "context": "Web", "stakeholder": "Users"}}
-    ]
-    next_id = generate_next_req_id(test_requirements)
-    print(f"Next REQ-ID: {next_id}")
-    
-    # Test conflict detection
-    print("\nTesting conflict detection:")
-    conflict = detect_conflicts("I need a mobile app", test_requirements)
-    print(f"Conflict detected: {conflict}")
-    
-    # Test volere extraction from requirements
-    print("\nTesting Volere extraction from requirements:")
-    volere_fields = extract_volere_from_requirements(test_requirements)
-    print(f"Auto-filled fields: {volere_fields}")
-    
-    # Test prompt building
-    print("\nTesting prompt building:")
-    test_history = [
-        {"role": "user", "content": "I need a login system"},
-        {"role": "assistant", "content": "Understood. Goal: Secure user authentication. Context: Web application. Stakeholder: End users"}
-    ]
-    
-    try:
-        messages, conflict_msg, new_req = decide_and_build_prompt(
-            "The system must validate passwords", 
-            test_history,
-            test_requirements
-        )
-        print(f"Generated {len(messages)} messages")
-        print(f"System prompt length: {len(messages[0]['content'])} characters")
-        if conflict_msg:
-            print(f"Conflict: {conflict_msg}")
-        if new_req:
-            print(f"New requirement: {new_req['id']} - {new_req['text']}")
-    except Exception as e:
-        print(f"Error building prompt: {e}")
-

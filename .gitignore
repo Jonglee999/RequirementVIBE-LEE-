@@ -49,3 +49,7 @@ Thumbs.db
 # Setup scripts (may contain API keys)
 setup.ps1
 
+# Application data
+users.json
+conversations/
+
