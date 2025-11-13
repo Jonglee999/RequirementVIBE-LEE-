@@ -362,7 +362,7 @@ if len(messages) == 0:
     st.markdown("""
     <div style='text-align: center; padding: 4rem 1rem 2rem 1rem; max-width: 700px; margin: 0 auto;'>
         <h1 style='color: #ececf1; font-size: 2.75rem; font-weight: 600; margin-bottom: 1.5rem; line-height: 1.2;'>What are you working on?</h1>
-        <p style='color: #8e8ea0; font-size: 1.1rem; line-height: 1.6; margin: 0;'>Ask MBSE ReqViber to help you analyze and refine your software requirements using Volere template structure.</p>
+        <p style='color: #8e8ea0; font-size: 1.1rem; line-height: 1.6; margin: 0;'>Ask MBSE ReqViber to help you analyze and refine your software requirements using IEEE 830 SRS or Volere template structure.</p>
         <p style='color: #8e8ea0; font-size: 1.1rem; line-height: 1.6; margin: 0;'>If you have any questions about using the website or about the project requirements, please feel free to contact me at wee235929@gmail.com.</p>
     </div>
     """, unsafe_allow_html=True)

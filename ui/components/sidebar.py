@@ -35,7 +35,7 @@ def render_sidebar():
         # Header
         st.markdown("""
         <div style='padding: 1rem 0 1.5rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 1rem;'>
-            <h2 style='color: #ececf1; margin: 0; font-size: 1.5rem;'>📋 UESTC-MBSE Requirement Assistant</h2>
+            <h2 style='color: #ececf1; margin: 0; font-size: 1.5rem;'>UESTC-MBSE Requirement Assistant</h2>
             <p style='color: #8e8ea0; margin: 0.25rem 0 0 0; font-size: 0.85rem;'>AI Requirements Analyst</p>
         </div>
         """, unsafe_allow_html=True)
@@ -69,7 +69,7 @@ def _render_user_info():
         </div>
         """, unsafe_allow_html=True)
         
-        if st.button("🚪 Logout", use_container_width=True, key="logout_button"):
+        if st.button("Logout", use_container_width=True, key="logout_button"):
             # Save conversations before logout if persistence is enabled
             if st.session_state.conversation_persistence_enabled and st.session_state.conversation_storage:
                 # Save current session before logout
@@ -97,7 +97,7 @@ def _render_model_selection():
     
     # Check authentication first
     if not st.session_state.authenticated:
-        st.info("🔒 Please log in to select a model")
+        st.info("Please log in to select a model")
         return
     
     # Determine if model can be changed
@@ -112,13 +112,13 @@ def _render_model_selection():
         <div style='padding: 0.75rem; background-color: #343541; border-radius: 6px; border: 1px solid #565869; margin-bottom: 1rem;'>
             <div style='color: #8e8ea0; font-size: 0.75rem; margin-bottom: 0.25rem;'>Current Model</div>
             <div style='color: #ececf1; font-size: 0.9rem; font-weight: 500;'>{current_model_info['name']}</div>
-            {f"<div style='color: #8e8ea0; font-size: 0.7rem; margin-top: 0.25rem;'>🔒 Model locked (session started)</div>" if model_locked else ""}
+            {f"<div style='color: #8e8ea0; font-size: 0.7rem; margin-top: 0.25rem;'>Model locked (session started)</div>" if model_locked else ""}
         </div>
         """, unsafe_allow_html=True)
     
     # Model selection button
     if not model_locked:
-        if st.button("🔀 Change Model", use_container_width=True, key="change_model_button"):
+        if st.button("Change Model", use_container_width=True, key="change_model_button"):
             st.session_state.show_model_selector = not st.session_state.show_model_selector
             st.rerun()
         
@@ -137,7 +137,7 @@ def _render_model_selection():
                             st.rerun()
     else:
         # Show warning if user tries to change model after session started
-        if st.button("🔀 Change Model", use_container_width=True, key="change_model_button_locked"):
+        if st.button("Change Model", use_container_width=True, key="change_model_button_locked"):
             st.session_state.model_change_warning = "Model cannot be changed after the session has started. Please create a new session to use a different model."
             st.rerun()
     
@@ -157,11 +157,11 @@ def _render_session_management():
     
     # Check authentication first
     if not st.session_state.authenticated:
-        st.info("🔒 Please log in to manage sessions")
+        st.info("Please log in to manage sessions")
         return
     
     # Create new session button
-    if st.button("➕ New Session", use_container_width=True, key="new_session_button"):
+    if st.button("Add New Session", use_container_width=True, key="new_session_button"):
         create_new_session()
         st.rerun()
     
@@ -239,10 +239,10 @@ def _render_srs_export():
     """Render SRS export button."""
     st.markdown("<div style='margin-top: 1.5rem; margin-bottom: 1rem;'><h3 style='color: #8e8ea0; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>Export</h3></div>", unsafe_allow_html=True)
     
-    if st.button("📄 Export SRS (Markdown)", use_container_width=True, key="export_srs_button"):
+    if st.button("Export SRS (Markdown)", use_container_width=True, key="export_srs_button"):
         # Check authentication first
         if not st.session_state.authenticated:
-            st.warning("🔒 Please log in first to export SRS")
+            st.warning("Please log in first to export SRS")
             st.rerun()
             return
         
@@ -278,7 +278,7 @@ def _render_srs_export():
     # Display generated SRS if available
     if st.session_state.generated_srs:
         st.download_button(
-            label="📥 Download SRS",
+            label="Download SRS",
             data=st.session_state.generated_srs,
             file_name="srs_document.md",
             mime="text/markdown",
@@ -291,7 +291,7 @@ def _render_context_summarization():
     """Render context summarization button."""
     st.markdown("<div style='margin-top: 1.5rem; margin-bottom: 1rem;'><h3 style='color: #8e8ea0; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>Context</h3></div>", unsafe_allow_html=True)
     
-    if st.button("📝 Summarize Context", use_container_width=True, key="summarize_context_button"):
+    if st.button("Summarize Context", use_container_width=True, key="summarize_context_button"):
         # Check authentication first
         if not st.session_state.authenticated:
             st.warning("🔒 Please log in first to summarize context")
@@ -331,7 +331,7 @@ def _render_conversation_persistence():
     
     # Conversation persistence toggle
     persistence_enabled = st.toggle(
-        "💬 Persist Conversations",
+        "Persist Conversations",
         value=st.session_state.conversation_persistence_enabled,
         key="persistence_toggle",
         help="Save conversations to disk (disabled by default)"

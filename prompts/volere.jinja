@@ -1,18 +1,19 @@
 
-VOLERE ANALYSIS:
+VOLERE / IEEE 830 SNAPSHOT:
 
+- Requirement ID: REQ-{{ req_id | default("FUNC-001") }}
 - Goal: {{ goal | default("Not stated") }}
-
-- Context: {{ context | default("Not asked") }}
-
 - Stakeholder: {{ stakeholder | default("Unknown") }}
+- Context / Scenario: {{ context | default("Not asked") }}
+- Requirement Description: {{ description | default("TBD") }}
+- Category: {{ category | default("Functional") }}
+- Priority (MoSCoW): {{ priority | default("To be classified") }}
+- Fit Criterion (measurable acceptance test): {{ fit_criterion | default("Define measurable success criteria") }}
+- Dependencies / Conflicts: {{ dependencies | default("Review against existing requirements") }}
 
 
+Next, ask 2–4 targeted questions to close any gaps (e.g., interfaces, performance, security, regulatory constraints). Reference earlier requirements if you detect conflicts.
 
-Next, ask ONE question to fill a missing field.
-
-If all are known, generate:
-
-Functional Requirement REQ-{{ req_id }}: {{ description }}
+If all critical details are known, generate a concise requirement statement that includes the ID, MoSCoW priority, and Fit Criterion.
 
 
