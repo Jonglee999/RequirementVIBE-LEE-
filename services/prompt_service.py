@@ -49,7 +49,7 @@ def load_character_card() -> CharacterCard:
     current_dir = os.path.dirname(os.path.abspath(__file__))
     # Go up one level to project root (from services/prompt_service.py to RequirenebtVIBE/)
     project_root = os.path.dirname(current_dir)
-    character_card_path = os.path.join(project_root, "character_card.json")
+    character_card_path = os.path.join(project_root, "config", "character_card.json")
     
     with open(character_card_path, 'r', encoding='utf-8') as f:
         character_data = json.load(f)

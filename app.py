@@ -50,7 +50,7 @@ from config.models import ALL_MODELS, AVAILABLE_MODELS
 # The sidebar starts expanded to show session management and model selection
 st.set_page_config(
     page_title="Requirement Auto Analysis:UESTC-MBSE Requirement Assistant",
-    page_icon="📋",
+    page_icon="RequirementVIBEICON.png",
     layout="wide",
     initial_sidebar_state="expanded"  # Start with sidebar expanded, but user can collapse it
 )

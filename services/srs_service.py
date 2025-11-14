@@ -9,7 +9,7 @@ import streamlit as st
 from typing import List, Dict, Any
 
 
-def generate_ieee830_srs_from_conversation(client, assistant_messages: List[str]) -> str:
+def generate_ieee830_srs_from_conversation(client, assistant_messages: List[str], model: str = None) -> str:
     """
     Generate IEEE 830 SRS document from conversation history using LLM API.
     
@@ -101,11 +101,15 @@ Format the output as a well-structured Markdown document following IEEE 830 stan
 Generate the complete SRS document now:"""
     
     try:
+        # Get model from parameter or session state
+        if model is None:
+            model = st.session_state.get("selected_model", "deepseek-chat")
+        
         # Call the LLM API to generate the SRS document
         # Uses the currently selected model (can be DeepSeek, GPT, Claude, or Grok)
         # Note: SRS generation can take longer due to large output, so we use extended timeout
         response = client.chat.completions.create(
-            model=st.session_state.selected_model,
+            model=model,
             messages=[
                 {"role": "system", "content": system_prompt},  # Instructions for SRS structure
                 {"role": "user", "content": user_prompt}       # Conversation context + formatting instructions

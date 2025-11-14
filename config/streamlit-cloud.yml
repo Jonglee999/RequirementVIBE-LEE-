@@ -40,5 +40,5 @@ configuration:
 # 5. Add DEEPSEEK_API_KEY in Secrets section
 # 6. Deploy!
 
-# For detailed instructions, see DEPLOYMENT.md
+# For detailed instructions, see docs/DEPLOYMENT.md
 

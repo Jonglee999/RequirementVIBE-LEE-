@@ -53,3 +53,6 @@ setup.ps1
 users.json
 conversations/
 
+# Test files
+tests/
+

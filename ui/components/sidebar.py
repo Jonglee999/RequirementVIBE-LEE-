@@ -246,31 +246,26 @@ def _render_srs_export():
             st.rerun()
             return
         
-        # Check if there are requirements to export
-        requirements = st.session_state.memory.get_requirements()
-        if not requirements:
-            st.warning("No requirements found. Please have a conversation with the AI first.")
+        # Check if there are assistant messages to generate SRS from
+        messages = st.session_state.memory.get_messages(include_system=False)
+        assistant_messages = [msg.get("content", "") for msg in messages if msg.get("role") == "assistant"]
+        
+        if not assistant_messages:
+            st.warning("No assistant messages found. Please have a conversation with the AI first.")
         else:
             # Generate SRS from conversation
             try:
                 with st.spinner("Generating SRS document..."):
                     client = get_centralized_client()
-                    messages = st.session_state.memory.get_messages(include_system=False)
                     
-                    # Get only assistant messages for SRS generation
-                    assistant_messages = [msg for msg in messages if msg.get("role") == "assistant"]
-                    
-                    if not assistant_messages:
-                        st.error("No assistant messages found. Please have a conversation with the AI first.")
-                    else:
-                        srs_content = generate_ieee830_srs_from_conversation(
-                            assistant_messages,
-                            client,
-                            model=st.session_state.selected_model
-                        )
-                        st.session_state.generated_srs = srs_content
-                        st.session_state.srs_generation_error = None
-                        st.success("SRS document generated successfully!")
+                    srs_content = generate_ieee830_srs_from_conversation(
+                        client,
+                        assistant_messages,
+                        model=st.session_state.selected_model
+                    )
+                    st.session_state.generated_srs = srs_content
+                    st.session_state.srs_generation_error = None
+                    st.success("SRS document generated successfully!")
             except Exception as e:
                 st.session_state.srs_generation_error = str(e)
                 st.error(f"Error generating SRS: {str(e)}")

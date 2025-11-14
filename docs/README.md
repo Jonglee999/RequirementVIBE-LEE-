@@ -6,9 +6,9 @@ A Streamlit application that uses DeepSeek API to analyze and refine software re
 
 **This is the DNA of ReqVibe — all behavior comes from here.**
 
-The `character_card.json` file defines ReqVibe's personality, expertise, and interaction style. This configuration file ensures consistent, professional requirements engineering assistance following industry standards like Volere and IEEE 830.
+The `config/character_card.json` file defines ReqVibe's personality, expertise, and interaction style. This configuration file ensures consistent, professional requirements engineering assistance following industry standards like Volere and IEEE 830.
 
-See `character_card.json` for the complete character definition.
+See `config/character_card.json` for the complete character definition.
 
 ## Setup
 
@@ -81,7 +81,7 @@ To deploy this app to Streamlit Cloud:
 DEEPSEEK_API_KEY = "YOUR API KEY"
 ```
 
-For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+For detailed deployment instructions, see [DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Features
 
