@@ -16,6 +16,7 @@ from config.models import ALL_MODELS, AVAILABLE_MODELS
 from models.memory import ShortTermMemory
 from services.srs_service import generate_ieee830_srs_from_conversation
 from clients.llm_client import get_centralized_client
+from ui.components.file_upload import render_file_upload
 
 
 def render_sidebar():
@@ -54,6 +55,9 @@ def render_sidebar():
         
         # Context summarization
         _render_context_summarization()
+        
+        # File upload
+        _render_file_upload()
         
         # Conversation persistence
         _render_conversation_persistence()
@@ -199,7 +203,8 @@ def _render_session_management():
                         st.rerun()
             
             with col2:
-                if st.button("🗑️", key=f"delete_session_{session_id}", help="Delete this conversation", use_container_width=True):
+                # Delete button with centered X symbol
+                if st.button("✖", key=f"delete_session_{session_id}", help="Delete this conversation", use_container_width=True):
                     # Delete the session
                     if session_id in st.session_state.sessions:
                         # If deleting current session, switch to another or create new
@@ -359,4 +364,9 @@ def _render_conversation_persistence():
             <div style='color: #8e8ea0; font-size: 0.7rem; margin-top: 0.25rem;'>{storage_info['storage_size'] / 1024:.1f} KB / {storage_info['max_storage_size'] / 1024:.0f} KB</div>
         </div>
         """, unsafe_allow_html=True)
+
+
+def _render_file_upload():
+    """Render file upload component."""
+    render_file_upload()
 

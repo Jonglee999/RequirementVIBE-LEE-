@@ -335,6 +335,12 @@ current_session = get_current_session()
 if current_session["messages"] and st.session_state.memory.get_history_length() == 0:
     st.session_state.memory.load_messages(current_session["messages"], reset=True)
 
+# Handle pending file upload message (from file upload component)
+if st.session_state.get("pending_file_upload_message") and not user_input:
+    # Use the pending message as user input
+    user_input = st.session_state.pending_file_upload_message
+    st.session_state.pending_file_upload_message = None  # Clear after use
+
 # Handle user input when a message is submitted
 if user_input:
     # Add user message to memory immediately (for display and context)
@@ -388,95 +394,144 @@ if user_input:
         # Get API client (centralized LLM API)
         client = get_deepseek_client()
         
-        # Get current requirements from memory (short-term)
-        current_requirements = st.session_state.memory.get_requirements()
+        # Check if GraphRAG should be used for this query
+        use_graphrag = False
+        graphrag_answer = None
         
-        # Get conversation history for prompt building
-        history = st.session_state.memory.get_messages(include_system=False)
+        if st.session_state.get("graphrag_index_built") and st.session_state.get("graphrag_index"):
+            from services.graphrag_service import (
+                is_document_related_query,
+                GraphRAGIndex,
+                answer_question_with_graphrag
+            )
+            
+            # Check if query is document-related
+            if is_document_related_query(user_input):
+                try:
+                    # Reconstruct GraphRAG index from serialized data
+                    index_data = st.session_state.graphrag_index
+                    graphrag_index = GraphRAGIndex.from_dict(index_data)
+                    
+                    # Rebuild graph and embeddings (they weren't serialized)
+                    from services.graphrag_service import build_graphrag_index
+                    if st.session_state.get("document_processing_results"):
+                        graphrag_index = build_graphrag_index(
+                            st.session_state.document_processing_results
+                        )
+                    
+                    # Try to answer using GraphRAG
+                    with st.chat_message("assistant"):
+                        with st.spinner("Searching documents..."):
+                            graphrag_answer = answer_question_with_graphrag(
+                                query=user_input,
+                                index=graphrag_index,
+                                llm_client=client,
+                                model=st.session_state.selected_model
+                            )
+                            # Display the GraphRAG answer
+                            st.markdown(graphrag_answer)
+                            use_graphrag = True
+                except Exception as e:
+                    # If GraphRAG fails, fall back to normal chat
+                    print(f"GraphRAG error: {str(e)}. Falling back to normal chat.")
+                    use_graphrag = False
         
-        # Use decide_and_build_prompt to build proper prompt and detect requirements
-        api_messages, conflict_message, new_requirement_data = decide_and_build_prompt(
-            user_message=user_input,
-            history=history,
-            requirements=current_requirements
-        )
-        
-        # Store pending requirement from user input (will be saved after assistant response)
-        if new_requirement_data:
-            st.session_state.pending_requirement = copy.deepcopy(new_requirement_data)
+        # If not using GraphRAG, use normal chat flow
+        if not use_graphrag:
+            # Get current requirements from memory (short-term)
+            current_requirements = st.session_state.memory.get_requirements()
+            
+            # Get conversation history for prompt building
+            history = st.session_state.memory.get_messages(include_system=False)
+            
+            # Use decide_and_build_prompt to build proper prompt and detect requirements
+            api_messages, conflict_message, new_requirement_data = decide_and_build_prompt(
+                user_message=user_input,
+                history=history,
+                requirements=current_requirements
+            )
+            
+            # Store pending requirement from user input (will be saved after assistant response)
+            if new_requirement_data:
+                st.session_state.pending_requirement = copy.deepcopy(new_requirement_data)
+            else:
+                st.session_state.pending_requirement = None
+            
+            # Get conversation context from memory with automatic token management
+            context_messages = st.session_state.memory.get_context_for_api(
+                max_tokens=3500,
+                client=client,
+                model=st.session_state.selected_model
+            )
+            
+            # Replace history in api_messages with context_messages (which may be truncated/summarized)
+            if api_messages and api_messages[0].get("role") == "system":
+                system_prompt = api_messages[0]["content"]
+                api_messages = [{"role": "system", "content": system_prompt}]
+                api_messages.extend(context_messages)
+                # Add current user message if not already in context_messages
+                if not any(msg.get("content") == user_input for msg in context_messages):
+                    api_messages.append({"role": "user", "content": user_input})
+            else:
+                # Fallback: use simple system prompt
+                system_prompt = "You are ReqViber, a professional requirements engineer. Use Volere template structure."
+                api_messages = [{"role": "system", "content": system_prompt}]
+                api_messages.extend(context_messages)
+            
+            # Display loading indicator and call the LLM API
+            with st.chat_message("assistant"):
+                with st.spinner("Analyzing requirement..."):
+                    # Call the centralized LLM API with selected model
+                    response = client.chat.completions.create(
+                        model=st.session_state.selected_model,
+                        messages=api_messages,
+                        temperature=0.7,
+                        max_tokens=2000
+                    )
+                    
+                    # Extract the generated text from API response
+                    ai_response = response.choices[0].message.content
+                    # Display the response as Markdown (supports formatting)
+                    st.markdown(ai_response)
         else:
-            st.session_state.pending_requirement = None
-        
-        # Get conversation context from memory with automatic token management
-        context_messages = st.session_state.memory.get_context_for_api(
-            max_tokens=3500,
-            client=client,
-            model=st.session_state.selected_model
-        )
-        
-        # Replace history in api_messages with context_messages (which may be truncated/summarized)
-        if api_messages and api_messages[0].get("role") == "system":
-            system_prompt = api_messages[0]["content"]
-            api_messages = [{"role": "system", "content": system_prompt}]
-            api_messages.extend(context_messages)
-            # Add current user message if not already in context_messages
-            if not any(msg.get("content") == user_input for msg in context_messages):
-                api_messages.append({"role": "user", "content": user_input})
-        else:
-            # Fallback: use simple system prompt
-            system_prompt = "You are ReqViber, a professional requirements engineer. Use Volere template structure."
-            api_messages = [{"role": "system", "content": system_prompt}]
-            api_messages.extend(context_messages)
-        
-        # Display loading indicator and call the LLM API
-        with st.chat_message("assistant"):
-            with st.spinner("Analyzing requirement..."):
-                # Call the centralized LLM API with selected model
-                response = client.chat.completions.create(
-                    model=st.session_state.selected_model,
-                    messages=api_messages,
-                    temperature=0.7,
-                    max_tokens=2000
-                )
-                
-                # Extract the generated text from API response
-                ai_response = response.choices[0].message.content
-                # Display the response as Markdown (supports formatting)
-                st.markdown(ai_response)
+            # Using GraphRAG answer
+            ai_response = graphrag_answer
         
         # Save AI response to memory for future context and display
         st.session_state.memory.add_message("assistant", ai_response)
         
-        # Extract and save requirements from AI response using requirement service
-        pending_requirement = st.session_state.pending_requirement
-        existing_requirements = st.session_state.memory.get_requirements()
-        
-        # Extract requirements from AI response
-        extracted_requirements = extract_requirements_from_response(
-            ai_response,
-            existing_requirements=existing_requirements
-        )
-        
-        # Save each extracted requirement
-        for requirement_data in extracted_requirements:
-            # Merge with pending requirement if it matches
-            original_req_id = requirement_data.get("id", "").upper()
-            if pending_requirement and pending_requirement.get("id", "").upper() == original_req_id:
-                requirement_data = merge_requirement_with_pending(
-                    requirement_data,
-                    pending_requirement,
-                    original_req_id
-                )
-                st.session_state.pending_requirement = None
+        # Only extract requirements if not using GraphRAG (GraphRAG answers are document-focused)
+        if not use_graphrag:
+            # Extract and save requirements from AI response using requirement service
+            pending_requirement = st.session_state.pending_requirement
+            existing_requirements = st.session_state.memory.get_requirements()
             
-            # Save to memory
-            try:
-                st.session_state.memory.add_requirement(requirement_data)
-                print(f"DEBUG: Successfully saved requirement {requirement_data.get('id')} to memory")
-            except Exception as e:
-                print(f"ERROR: Failed to save requirement {requirement_data.get('id')}: {str(e)}")
-                import traceback
-                traceback.print_exc()
+            # Extract requirements from AI response
+            extracted_requirements = extract_requirements_from_response(
+                ai_response,
+                existing_requirements=existing_requirements
+            )
+            
+            # Save each extracted requirement
+            for requirement_data in extracted_requirements:
+                # Merge with pending requirement if it matches
+                original_req_id = requirement_data.get("id", "").upper()
+                if pending_requirement and pending_requirement.get("id", "").upper() == original_req_id:
+                    requirement_data = merge_requirement_with_pending(
+                        requirement_data,
+                        pending_requirement,
+                        original_req_id
+                    )
+                    st.session_state.pending_requirement = None
+                
+                # Save to memory
+                try:
+                    st.session_state.memory.add_requirement(requirement_data)
+                    print(f"DEBUG: Successfully saved requirement {requirement_data.get('id')} to memory")
+                except Exception as e:
+                    print(f"ERROR: Failed to save requirement {requirement_data.get('id')}: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
         
         st.rerun()  # Refresh UI to show the new message
         

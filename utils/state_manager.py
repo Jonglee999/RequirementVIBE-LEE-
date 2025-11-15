@@ -91,4 +91,26 @@ def initialize_session_state():
     # show_password_reset: Boolean flag to toggle password reset page
     if "show_password_reset" not in st.session_state:
         st.session_state.show_password_reset = False
+    
+    # File Upload State
+    # document_processing_results: Results from processing uploaded documents
+    if "document_processing_results" not in st.session_state:
+        st.session_state.document_processing_results = None
+    # document_processing_error: Error message if document processing failed
+    if "document_processing_error" not in st.session_state:
+        st.session_state.document_processing_error = None
+    # document_processing_formatted: Formatted text output from document processing
+    if "document_processing_formatted" not in st.session_state:
+        st.session_state.document_processing_formatted = None
+    # pending_file_upload_message: Message to be added to chat from file upload
+    if "pending_file_upload_message" not in st.session_state:
+        st.session_state.pending_file_upload_message = None
+    
+    # GraphRAG State
+    # graphrag_index: Serialized GraphRAG index dictionary
+    if "graphrag_index" not in st.session_state:
+        st.session_state.graphrag_index = None
+    # graphrag_index_built: Boolean flag indicating if GraphRAG index has been built
+    if "graphrag_index_built" not in st.session_state:
+        st.session_state.graphrag_index_built = False
 

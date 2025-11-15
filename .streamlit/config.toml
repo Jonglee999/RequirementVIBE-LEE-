@@ -9,4 +9,5 @@ font = "sans serif"
 headless = true
 enableCORS = false
 enableXsrfProtection = true
+maxUploadSize = 10  # Maximum file upload size in MB (10MB limit)
 

@@ -22,7 +22,7 @@ def show_login_page():
     """
     st.markdown("""
     <div style='text-align: center; padding: 4rem 1rem 2rem 1rem; max-width: 500px; margin: 0 auto;'>
-        <h1 style='color: #ececf1; font-size: 2.5rem; font-weight: 600; margin-bottom: 0.5rem;'>Welcome to RequirementVIBE, Log in to explore endless possibilities</h1>
+        <h1 style='color: #ececf1; font-size: 2.5rem; font-weight: 600; margin-bottom: 0.5rem;'>Welcome to UESTC MBSE RequirementVIBE, Log in to explore endless possibilities</h1>
         <p style='color: #8e8ea0; font-size: 1rem; margin-bottom: 2rem;'>Sign in to access your requirements</p>
     </div>
     """, unsafe_allow_html=True)
@@ -116,7 +116,7 @@ def show_register_page():
     """
     st.markdown("""
     <div style='text-align: center; padding: 4rem 1rem 2rem 1rem; max-width: 500px; margin: 0 auto;'>
-        <h1 style='color: #ececf1; font-size: 2.5rem; font-weight: 600; margin-bottom: 0.5rem;'>📋 Create Account</h1>
+        <h1 style='color: #ececf1; font-size: 2.5rem; font-weight: 600; margin-bottom: 0.5rem;'>Create Account</h1>
         <p style='color: #8e8ea0; font-size: 1rem; margin-bottom: 2rem;'>Register to start managing your requirements</p>
     </div>
     """, unsafe_allow_html=True)

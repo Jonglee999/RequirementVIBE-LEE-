@@ -121,6 +121,18 @@ def get_custom_css() -> str:
         border-color: #565869;
     }
     
+    /* Delete button - center the X symbol by targeting buttons in the second column */
+    section[data-testid="stSidebar"] [data-testid="column"]:nth-of-type(2) .stButton > button,
+    section[data-testid="stSidebar"] [data-baseweb="column"]:nth-of-type(2) .stButton > button {
+        text-align: center !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0.5rem !important;
+        font-size: 1rem !important;
+        line-height: 1 !important;
+    }
+    
     /* Chat message styling */
     .stChatMessage {
         padding: 1.5rem 0;
