@@ -113,4 +113,17 @@ def initialize_session_state():
     # graphrag_index_built: Boolean flag indicating if GraphRAG index has been built
     if "graphrag_index_built" not in st.session_state:
         st.session_state.graphrag_index_built = False
+    
+    # Mermaid Rendering State
+    # _mermaid_js_loaded: Boolean flag to track if Mermaid.js library has been loaded
+    if "_mermaid_js_loaded" not in st.session_state:
+        st.session_state._mermaid_js_loaded = False
+    
+    # Role Selection State
+    # selected_role: Currently selected role (e.g., "analyst", "architect", "developer", "tester")
+    if "selected_role" not in st.session_state:
+        st.session_state.selected_role = "analyst"  # Default role
+    # role_data: Loaded character card data for the selected role
+    if "role_data" not in st.session_state:
+        st.session_state.role_data = None
 

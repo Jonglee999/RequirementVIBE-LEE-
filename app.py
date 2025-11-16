@@ -17,7 +17,6 @@ Main Components:
 """
 
 import streamlit as st
-import re
 import copy
 
 # UI Components
@@ -32,7 +31,7 @@ from services.prompt_service import decide_and_build_prompt
 from services.conversation_service import ConversationStorage
 
 # Clients
-from clients.llm_client import get_centralized_client, get_deepseek_client
+from clients.llm_client import get_deepseek_client
 
 # Models
 from models.memory import ShortTermMemory
@@ -40,8 +39,7 @@ from models.memory import ShortTermMemory
 # Utils
 from utils.state_manager import initialize_session_state
 
-# Config
-from config.models import ALL_MODELS, AVAILABLE_MODELS
+# Config (models are used in sidebar component, not directly in app.py)
 
 # ----------------------------------------------------------------------
 # Page Configuration
@@ -376,7 +374,12 @@ else:
     # Display all chat messages including the new user message
     for message in messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            # Use Mermaid renderer for assistant messages to detect and render diagrams
+            if message["role"] == "assistant":
+                from utils.mermaid_renderer import render_message_with_mermaid
+                render_message_with_mermaid(message["content"])
+            else:
+                st.markdown(message["content"])
 
 # ----------------------------------------------------------------------
 # AI Response Generation
@@ -428,8 +431,9 @@ if user_input:
                                 llm_client=client,
                                 model=st.session_state.selected_model
                             )
-                            # Display the GraphRAG answer
-                            st.markdown(graphrag_answer)
+                            # Display the GraphRAG answer with Mermaid support
+                            from utils.mermaid_renderer import render_message_with_mermaid
+                            render_message_with_mermaid(graphrag_answer)
                             use_graphrag = True
                 except Exception as e:
                     # If GraphRAG fails, fall back to normal chat
@@ -491,8 +495,9 @@ if user_input:
                     
                     # Extract the generated text from API response
                     ai_response = response.choices[0].message.content
-                    # Display the response as Markdown (supports formatting)
-                    st.markdown(ai_response)
+                    # Display the response with Mermaid diagram support
+                    from utils.mermaid_renderer import render_message_with_mermaid
+                    render_message_with_mermaid(ai_response)
         else:
             # Using GraphRAG answer
             ai_response = graphrag_answer

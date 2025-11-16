@@ -17,6 +17,7 @@ from models.memory import ShortTermMemory
 from services.srs_service import generate_ieee830_srs_from_conversation
 from clients.llm_client import get_centralized_client
 from ui.components.file_upload import render_file_upload
+from services.prompt_service import load_role
 
 
 def render_sidebar():
@@ -43,6 +44,9 @@ def render_sidebar():
         
         # User info and logout
         _render_user_info()
+        
+        # Role selection
+        _render_role_selection()
         
         # Model selection
         _render_model_selection()
@@ -93,6 +97,61 @@ def _render_user_info():
             st.session_state.current_session_id = None
             st.session_state.conversation_persistence_enabled = False
             st.rerun()
+
+
+def _render_role_selection():
+    """Render role selection UI."""
+    st.markdown("<div style='margin-bottom: 1rem;'><h3 style='color: #8e8ea0; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>Role Selection</h3></div>", unsafe_allow_html=True)
+    
+    # Available roles
+    available_roles = {
+        "analyst": "Requirements Analyst",
+        "architect": "System Architect",
+        "developer": "Full Stack Developer",
+        "tester": "Software Test Engineer"
+    }
+    
+    # Get current role
+    current_role = st.session_state.get("selected_role", "analyst")
+    
+    # Load initial role if not already loaded
+    if st.session_state.get("role_data") is None:
+        try:
+            role_data = load_role(current_role)
+            st.session_state.role_data = role_data.model_dump()
+        except Exception as e:
+            st.error(f"Failed to load initial role '{current_role}': {str(e)}")
+    
+    # Role selection selectbox
+    selected_role = st.selectbox(
+        "Select Role",
+        options=list(available_roles.keys()),
+        format_func=lambda x: available_roles[x],
+        index=list(available_roles.keys()).index(current_role) if current_role in available_roles else 0,
+        key="role_selectbox"
+    )
+    
+    # Check if role changed
+    if selected_role != current_role:
+        # Load the new role and store in session state
+        try:
+            role_data = load_role(selected_role)
+            st.session_state.selected_role = selected_role
+            st.session_state.role_data = role_data.model_dump()
+            st.rerun()
+        except Exception as e:
+            st.error(f"Failed to load role '{selected_role}': {str(e)}")
+    
+    # Display current role info (use selected_role which may have been updated)
+    active_role = st.session_state.get("selected_role", "analyst")
+    if active_role in available_roles:
+        role_name = available_roles[active_role]
+        st.markdown(f"""
+        <div style='padding: 0.75rem; background-color: #343541; border-radius: 6px; border: 1px solid #565869; margin-top: 0.5rem;'>
+            <div style='color: #8e8ea0; font-size: 0.75rem; margin-bottom: 0.25rem;'>Active Role</div>
+            <div style='color: #ececf1; font-size: 0.9rem; font-weight: 500;'>{role_name}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def _render_model_selection():

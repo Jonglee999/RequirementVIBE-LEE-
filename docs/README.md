@@ -6,9 +6,15 @@ A Streamlit application that uses DeepSeek API to analyze and refine software re
 
 **This is the DNA of ReqVibe — all behavior comes from here.**
 
-The `config/character_card.json` file defines ReqVibe's personality, expertise, and interaction style. This configuration file ensures consistent, professional requirements engineering assistance following industry standards like Volere and IEEE 830.
+The `config/roles/analyst.json` file (default) defines ReqVibe's personality, expertise, and interaction style. Multiple role configurations are available in `config/roles/`:
+- `analyst.json` - Requirements analyst (default)
+- `architect.json` - Software architect
+- `developer.json` - Full-stack developer
+- `tester.json` - QA engineer
 
-See `config/character_card.json` for the complete character definition.
+These configuration files ensure consistent, professional requirements engineering assistance following industry standards like Volere and IEEE 830.
+
+See `config/roles/analyst.json` for the default character definition.
 
 ## Setup
 

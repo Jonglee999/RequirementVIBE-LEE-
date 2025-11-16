@@ -35,21 +35,24 @@ class CharacterCard(BaseModel):
     example_interaction: ExampleInteraction
 
 
-def load_character_card() -> CharacterCard:
+def load_character_card(role: str = "analyst") -> CharacterCard:
     """
-    Load and validate character_card.json using Pydantic.
+    Load and validate character card JSON from roles folder using Pydantic.
+    
+    Args:
+        role: The role to load (default: "analyst"). Options: "analyst", "architect", "developer", "tester"
     
     Returns:
         CharacterCard: Validated character card data
     
     Raises:
-        FileNotFoundError: If character_card.json doesn't exist
+        FileNotFoundError: If the role JSON file doesn't exist
         ValidationError: If the JSON doesn't match the expected structure
     """
     current_dir = os.path.dirname(os.path.abspath(__file__))
     # Go up one level to project root (from services/prompt_service.py to RequirenebtVIBE/)
     project_root = os.path.dirname(current_dir)
-    character_card_path = os.path.join(project_root, "config", "character_card.json")
+    character_card_path = os.path.join(project_root, "config", "roles", f"{role}.json")
     
     with open(character_card_path, 'r', encoding='utf-8') as f:
         character_data = json.load(f)
@@ -57,6 +60,20 @@ def load_character_card() -> CharacterCard:
     # Validate using Pydantic
     character_card = CharacterCard(**character_data)
     return character_card
+
+
+def load_role(role: str = "analyst") -> CharacterCard:
+    """
+    Load role configuration from roles folder.
+    This is an alias for load_character_card() for compatibility.
+    
+    Args:
+        role: The role to load (default: "analyst"). Options: "analyst", "architect", "developer", "tester"
+    
+    Returns:
+        CharacterCard: Validated character card data
+    """
+    return load_character_card(role)
 
 
 def contains_requirement_phrase(message: str) -> bool:
@@ -481,8 +498,21 @@ def decide_and_build_prompt(
             - conflict_message: Conflict detection message if conflict found, None otherwise
             - new_requirement_data: Dict with 'id', 'text', 'volere' for new requirement if detected, None otherwise
     """
-    # Load character card
-    character_card = load_character_card()
+    # Load character card - use role from session state if available, otherwise default to "analyst"
+    try:
+        import streamlit as st
+        selected_role = st.session_state.get("selected_role", "analyst")
+    except (ImportError, RuntimeError):
+        # If streamlit is not available (e.g., during testing), use default role
+        selected_role = "analyst"
+    character_card = load_character_card(role=selected_role)
+    
+    # Store role data in session state for quick access
+    try:
+        st.session_state.role_data = character_card.model_dump()
+    except (NameError, RuntimeError):
+        # If streamlit is not available, skip storing in session state
+        pass
     
     # Convert character card to dict for template rendering
     character_dict = character_card.model_dump()
@@ -547,6 +577,10 @@ def decide_and_build_prompt(
             "character": character_dict
         }
         system_prompt = render_prompt("base", template_context)
+    
+    # Enhance prompt with Mermaid diagram instructions if needed
+    from utils.mermaid_renderer import enhance_prompt_for_mermaid
+    system_prompt = enhance_prompt_for_mermaid(user_message, system_prompt)
     
     # Build the full messages list
     messages = [
