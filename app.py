@@ -16,12 +16,37 @@ Main Components:
 """
 
 # Add project root to Python path for Streamlit Cloud compatibility
+# This MUST be done before any other imports
 import sys
 import os
 
-# Get the directory containing this file (app.py)
-_project_root = os.path.dirname(os.path.abspath(__file__))
-if _project_root not in sys.path:
+def _find_project_root():
+    """Find the project root by looking for app.py or requirements.txt."""
+    # Start from this file's directory (app.py should be in project root)
+    current = os.path.dirname(os.path.abspath(__file__))
+    
+    # Check if current directory is project root
+    if os.path.exists(os.path.join(current, 'domain')) and \
+       (os.path.exists(os.path.join(current, 'app.py')) or 
+        os.path.exists(os.path.join(current, 'requirements.txt'))):
+        return current
+    
+    # Go up the directory tree looking for project root markers
+    for _ in range(3):  # Max 3 levels up
+        current = os.path.dirname(current)
+        # Check for project root markers
+        if os.path.exists(os.path.join(current, 'app.py')) or \
+           os.path.exists(os.path.join(current, 'requirements.txt')):
+            # Verify it has the domain package
+            if os.path.exists(os.path.join(current, 'domain')):
+                return current
+    
+    # Fallback: use directory containing app.py
+    return os.path.dirname(os.path.abspath(__file__))
+
+# Find and add project root to sys.path
+_project_root = _find_project_root()
+if _project_root and _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 # Load environment variables from .env file

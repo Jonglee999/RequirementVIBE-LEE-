@@ -5,16 +5,47 @@ This module contains the login, registration, and password reset page components
 """
 
 # Add project root to Python path for Streamlit Cloud compatibility
+# This MUST be done before any other imports
 import sys
 import os
 
-# Get the project root (parent of presentation/pages)
-_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if _project_root not in sys.path:
+def _find_project_root():
+    """Find the project root by looking for app.py or requirements.txt."""
+    # Start from this file's directory
+    current = os.path.abspath(__file__)
+    
+    # Go up the directory tree looking for project root markers
+    for _ in range(5):  # Max 5 levels up
+        current = os.path.dirname(current)
+        # Check for project root markers
+        if os.path.exists(os.path.join(current, 'app.py')) or \
+           os.path.exists(os.path.join(current, 'requirements.txt')):
+            # Verify it has the domain package
+            if os.path.exists(os.path.join(current, 'domain')):
+                return current
+    
+    # Fallback: calculate from file path (presentation/pages/auth.py -> project_root)
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Find and add project root to sys.path
+_project_root = _find_project_root()
+if _project_root and _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import streamlit as st
-from domain.conversations.service import ConversationStorage
+
+# Import with fallback for Streamlit Cloud compatibility
+try:
+    from domain.conversations.service import ConversationStorage
+except ModuleNotFoundError:
+    # Try adding parent directory if domain not found
+    _parent = os.path.dirname(_project_root) if _project_root else None
+    if _parent and _parent not in sys.path and os.path.exists(os.path.join(_parent, 'domain')):
+        sys.path.insert(0, _parent)
+        from domain.conversations.service import ConversationStorage
+    else:
+        raise
+
 from application.email.service import get_email_service
 
 
