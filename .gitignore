@@ -24,9 +24,10 @@ wheels/
 *.egg
 
 # Streamlit
-# Note: .streamlit/secrets.toml with commented/empty values can be committed
-# But if you add actual API keys, make sure to add it to .gitignore
-# .streamlit/secrets.toml
+.streamlit/secrets.toml
+.streamlit/*.toml
+!.streamlit/config.toml
+!.streamlit/secrets.toml.example
 
 # IDE
 .vscode/
@@ -42,6 +43,13 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+.env.*
+!.env.example
+
+# LangSmith
+langsmith/langsmith_settings.json
+langsmith/*.json
+!langsmith/langsmith_settings.example.json
 
 # Logs
 *.log
@@ -51,7 +59,11 @@ setup.ps1
 
 # Application data
 users.json
+application/users.json
 conversations/
+db/
+*.sqlite3
+*.db
 
 # Test files
 tests/

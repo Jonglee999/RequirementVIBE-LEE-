@@ -1,14 +1,15 @@
 streamlit>=1.28.0
-openai>=1.0.0  # Required for DeepSeek API (OpenAI-compatible SDK)
-requests>=2.31.0  # Required for centralized LLM API and Unstructured API (fallback)
+requests>=2.31.0  # Required for centralized LLM API and Unstructured API
 urllib3>=2.0.0  # Required for SSL handling and retry logic
-unstructured-client>=0.22.0  # Official Unstructured API Python SDK (recommended)
+unstructured-client>=0.22.0  # Official Unstructured API Python SDK
 Jinja2>=3.0.0
 pydantic>=2.0.0
 tiktoken>=0.5.0
 bcrypt>=4.0.0  # Password hashing for user authentication
-resend>=0.9.0
 networkx>=3.0  # GraphRAG: Knowledge graph construction
 numpy>=1.24.0  # GraphRAG: Numerical operations for embeddings
 sentence-transformers>=2.2.0  # GraphRAG: Text embeddings (optional but recommended)
+langsmith>=0.1.45  # Observability and tracing
+python-dotenv>=1.0.0  # Load environment variables from .env file
+Pillow>=10.0.0  # Image processing for icons
 

@@ -3,10 +3,9 @@ ReqVibe - AI Requirements Analyst Application
 
 This Streamlit application provides an AI-powered requirements engineering assistant that:
 - Analyzes and refines software requirements using Volere template structure
-- Supports multiple LLM models (DeepSeek, GPT, Claude, Grok) via centralized API
+- Supports multiple LLM models (DeepSeek, GPT, Claude, Grok, Gemini) via centralized API
 - Manages conversation sessions with persistent chat history
 - Generates IEEE 830 SRS documents from conversations
-- Provides context summarization for long conversations
 
 Main Components:
 1. Centralized LLM API Client - Wraps the centralized API to mimic OpenAI interface
@@ -16,28 +15,83 @@ Main Components:
 5. SRS Generation - Converts conversation history to IEEE 830 format documents
 """
 
+# Load environment variables from .env file
+# This must be done before any other imports that might use environment variables
+from dotenv import load_dotenv
+import os
+
+# Load .env file from project root directory (same directory as app.py)
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(env_path):
+    # Only load once to avoid redundant parsing when Streamlit reruns scripts
+    load_dotenv(dotenv_path=env_path, override=False)
+
 import streamlit as st
 import copy
+import time
 
-# UI Components
-from ui.styles import apply_styles
-from ui.pages.auth import show_login_page, show_register_page, show_password_reset_page
-from ui.components.sidebar import render_sidebar
+# Presentation Layer (UI)
+from presentation.styles import apply_styles
+from presentation.pages.auth import show_login_page, show_register_page, show_password_reset_page
+from presentation.components.sidebar import render_sidebar
 
-# Services
-from services.session_service import create_new_session, get_current_session, update_session_title
-from services.requirement_service import extract_requirements_from_response, merge_requirement_with_pending
-from services.prompt_service import decide_and_build_prompt
-from services.conversation_service import ConversationStorage
+# Domain Services
+from domain.sessions.service import create_new_session, get_current_session, update_session_title
+from domain.requirements.service import extract_requirements_from_response, merge_requirement_with_pending
+from domain.prompts.service import decide_and_build_prompt
+from domain.conversations.service import ConversationStorage
 
-# Clients
-from clients.llm_client import get_deepseek_client
+# Infrastructure
+from infrastructure.llm.client import get_centralized_client
 
-# Models
-from models.memory import ShortTermMemory
+# Core Models
+from core.models.memory import ShortTermMemory
 
 # Utils
 from utils.state_manager import initialize_session_state
+from monitoring.langsmith import traceable
+
+
+@traceable(name="format_prompt", run_type="chain")
+def format_prompt(user_message, history, requirements):
+    """Build system prompt and extract new requirement data."""
+    return decide_and_build_prompt(
+        user_message=user_message,
+        history=history,
+        requirements=requirements
+    )
+
+
+@traceable(name="invoke_llm", run_type="llm")
+def invoke_llm_response(
+    client,
+    model_name,
+    messages,
+    temperature=0.7,
+    max_tokens=2000,
+    stream=False,
+    **kwargs,
+):
+    """Send the prompt to the centralized LLM API."""
+    return client.chat.completions.create(
+        model=model_name,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        stream=stream,
+        **kwargs,
+    )
+
+
+@traceable(name="parse_model_response")
+def parse_model_response(response):
+    """Extract assistant text from an LLM response object."""
+    if not response:
+        return ""
+    try:
+        return response.choices[0].message.content
+    except (AttributeError, IndexError, KeyError, TypeError):
+        return ""
 
 # Config (models are used in sidebar component, not directly in app.py)
 
@@ -46,9 +100,22 @@ from utils.state_manager import initialize_session_state
 # ----------------------------------------------------------------------
 # Sets up the Streamlit page with title, icon, layout, and initial sidebar state
 # The sidebar starts expanded to show session management and model selection
+# Load icon for page config
+from PIL import Image
+
+# Get the path to the icon file
+icon_path = os.path.join(os.path.dirname(__file__), "RequirementVIBEICON.png")
+page_icon = None
+if os.path.exists(icon_path):
+    try:
+        page_icon = Image.open(icon_path)
+    except Exception as e:
+        print(f"Could not load icon: {e}")
+        page_icon = "📋"  # Fallback to emoji
+
 st.set_page_config(
     page_title="Requirement Auto Analysis:UESTC-MBSE Requirement Assistant",
-    page_icon="RequirementVIBEICON.png",
+    page_icon=page_icon if page_icon else "📋",
     layout="wide",
     initial_sidebar_state="expanded"  # Start with sidebar expanded, but user can collapse it
 )
@@ -76,8 +143,8 @@ initialize_session_state()
 # by analyzing the assistant's responses from the conversation and formatting
 # them according to the IEEE 830 standard structure.
 
-# Note: SRS generation function has been moved to services/srs_service.py
-# Use generate_ieee830_srs_from_conversation() from services.srs_service module
+# Note: SRS generation function has been moved to domain/documents/srs.py
+# Use generate_ieee830_srs_from_conversation() from domain.documents.srs module
 
 # ----------------------------------------------------------------------
 # Sidebar UI - Session and Model Management
@@ -87,7 +154,7 @@ initialize_session_state()
 # 1. Model selection (with lock mechanism after session starts)
 # 2. Session management (create new, switch between sessions)
 # 3. SRS export functionality
-# 4. Context summarization
+# 4. File upload and document processing
 # 5. Conversation persistence settings
 
 render_sidebar()
@@ -376,7 +443,7 @@ else:
         with st.chat_message(message["role"]):
             # Use Mermaid renderer for assistant messages to detect and render diagrams
             if message["role"] == "assistant":
-                from utils.mermaid_renderer import render_message_with_mermaid
+                from utils.renderers.mermaid import render_message_with_mermaid
                 render_message_with_mermaid(message["content"])
             else:
                 st.markdown(message["content"])
@@ -395,14 +462,14 @@ else:
 if user_input:
     try:
         # Get API client (centralized LLM API)
-        client = get_deepseek_client()
+        client = get_centralized_client()
         
         # Check if GraphRAG should be used for this query
         use_graphrag = False
         graphrag_answer = None
         
         if st.session_state.get("graphrag_index_built") and st.session_state.get("graphrag_index"):
-            from services.graphrag_service import (
+            from infrastructure.graphrag.service import (
                 is_document_related_query,
                 GraphRAGIndex,
                 answer_question_with_graphrag
@@ -416,7 +483,7 @@ if user_input:
                     graphrag_index = GraphRAGIndex.from_dict(index_data)
                     
                     # Rebuild graph and embeddings (they weren't serialized)
-                    from services.graphrag_service import build_graphrag_index
+                    from infrastructure.graphrag.service import build_graphrag_index
                     if st.session_state.get("document_processing_results"):
                         graphrag_index = build_graphrag_index(
                             st.session_state.document_processing_results
@@ -432,7 +499,7 @@ if user_input:
                                 model=st.session_state.selected_model
                             )
                             # Display the GraphRAG answer with Mermaid support
-                            from utils.mermaid_renderer import render_message_with_mermaid
+                            from utils.renderers.mermaid import render_message_with_mermaid
                             render_message_with_mermaid(graphrag_answer)
                             use_graphrag = True
                 except Exception as e:
@@ -449,7 +516,7 @@ if user_input:
             history = st.session_state.memory.get_messages(include_system=False)
             
             # Use decide_and_build_prompt to build proper prompt and detect requirements
-            api_messages, conflict_message, new_requirement_data = decide_and_build_prompt(
+            api_messages, conflict_message, new_requirement_data = format_prompt(
                 user_message=user_input,
                 history=history,
                 requirements=current_requirements
@@ -468,7 +535,7 @@ if user_input:
                 model=st.session_state.selected_model
             )
             
-            # Replace history in api_messages with context_messages (which may be truncated/summarized)
+            # Replace history in api_messages with context_messages (which may be truncated)
             if api_messages and api_messages[0].get("role") == "system":
                 system_prompt = api_messages[0]["content"]
                 api_messages = [{"role": "system", "content": system_prompt}]
@@ -482,22 +549,68 @@ if user_input:
                 api_messages = [{"role": "system", "content": system_prompt}]
                 api_messages.extend(context_messages)
             
-            # Display loading indicator and call the LLM API
+            # Display streaming response from the LLM API
             with st.chat_message("assistant"):
-                with st.spinner("Analyzing requirement..."):
-                    # Call the centralized LLM API with selected model
-                    response = client.chat.completions.create(
-                        model=st.session_state.selected_model,
+                message_container = st.container()
+                stream_placeholder = message_container.empty()
+                streamed_text = ""
+                last_update_time = 0.0
+                try:
+                    stream = invoke_llm_response(
+                        client=client,
+                        model_name=st.session_state.selected_model,
                         messages=api_messages,
                         temperature=0.7,
-                        max_tokens=2000
+                        max_tokens=2000,
+                        stream=True,
                     )
                     
-                    # Extract the generated text from API response
-                    ai_response = response.choices[0].message.content
-                    # Display the response with Mermaid diagram support
-                    from utils.mermaid_renderer import render_message_with_mermaid
-                    render_message_with_mermaid(ai_response)
+                    for chunk in stream:
+                        if not chunk:
+                            continue
+                        choices = chunk.get("choices", [])
+                        if not choices:
+                            continue
+                        delta = choices[0].get("delta", {})
+                        content = delta.get("content")
+                        if content:
+                            # Ensure content is properly decoded as UTF-8 string
+                            if isinstance(content, bytes):
+                                content = content.decode('utf-8', errors='replace')
+                            streamed_text += content
+                            current_time = time.time()
+                            if (
+                                current_time - last_update_time >= 0.05
+                                or content.endswith((".", "!", "?", "\n"))
+                            ):
+                                stream_placeholder.markdown(streamed_text + "▌")
+                                last_update_time = current_time
+                    
+                    stream_placeholder.empty()
+                    ai_response = streamed_text.strip() or "I couldn't generate a response. Please try again."
+                    from utils.renderers.mermaid import render_message_with_mermaid
+                    with message_container:
+                        render_message_with_mermaid(ai_response)
+                except Exception as stream_error:
+                    stream_placeholder.empty()
+                    print(f"Streaming error: {stream_error}")
+                    st.warning(
+                        "Streaming isn't available right now. Showing the full response instead.",
+                        icon="⚠️",
+                    )
+                    with st.spinner("Analyzing requirement..."):
+                        response = invoke_llm_response(
+                            client=client,
+                            model_name=st.session_state.selected_model,
+                            messages=api_messages,
+                            temperature=0.7,
+                            max_tokens=2000,
+                            stream=False,
+                        )
+                        ai_response = parse_model_response(response) or "I couldn't generate a response. Please try again."
+                        from utils.renderers.mermaid import render_message_with_mermaid
+                        with message_container:
+                            render_message_with_mermaid(ai_response)
         else:
             # Using GraphRAG answer
             ai_response = graphrag_answer

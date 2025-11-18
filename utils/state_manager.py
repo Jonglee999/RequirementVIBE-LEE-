@@ -6,8 +6,8 @@ It centralizes all session state initialization to ensure consistency.
 """
 
 import streamlit as st
-from models.memory import ShortTermMemory
-from services.auth_service import AuthManager
+from core.models.memory import ShortTermMemory
+from application.auth.service import AuthManager
 
 
 def initialize_session_state():
