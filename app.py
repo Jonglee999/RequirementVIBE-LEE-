@@ -26,19 +26,25 @@ def _find_project_root():
     current = os.path.dirname(os.path.abspath(__file__))
     
     # Check if current directory is project root
-    if os.path.exists(os.path.join(current, 'domain')) and \
-       (os.path.exists(os.path.join(current, 'app.py')) or 
-        os.path.exists(os.path.join(current, 'requirements.txt'))):
-        return current
+    has_domain = os.path.exists(os.path.join(current, 'domain'))
+    has_app = os.path.exists(os.path.join(current, 'app.py'))
+    has_requirements = os.path.exists(os.path.join(current, 'requirements.txt'))
+    
+    if has_domain and (has_app or has_requirements):
+        # Verify domain/conversations exists
+        if os.path.exists(os.path.join(current, 'domain', 'conversations')):
+            return current
     
     # Go up the directory tree looking for project root markers
-    for _ in range(3):  # Max 3 levels up
+    for _ in range(6):  # Max 6 levels up (to handle /mount/src/requirementvibe structure)
         current = os.path.dirname(current)
-        # Check for project root markers
-        if os.path.exists(os.path.join(current, 'app.py')) or \
-           os.path.exists(os.path.join(current, 'requirements.txt')):
-            # Verify it has the domain package
-            if os.path.exists(os.path.join(current, 'domain')):
+        has_domain = os.path.exists(os.path.join(current, 'domain'))
+        has_app = os.path.exists(os.path.join(current, 'app.py'))
+        has_requirements = os.path.exists(os.path.join(current, 'requirements.txt'))
+        
+        if has_domain and (has_app or has_requirements):
+            # Verify domain/conversations exists
+            if os.path.exists(os.path.join(current, 'domain', 'conversations')):
                 return current
     
     # Fallback: use directory containing app.py
@@ -46,8 +52,20 @@ def _find_project_root():
 
 # Find and add project root to sys.path
 _project_root = _find_project_root()
-if _project_root and _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
+
+# Add project root to sys.path with verification
+if _project_root:
+    if _project_root not in sys.path:
+        sys.path.insert(0, _project_root)
+    
+    # Verify the path works by checking if domain package is accessible
+    domain_path = os.path.join(_project_root, 'domain')
+    if not os.path.exists(domain_path):
+        # Try parent directory (for cases where repo is in a subdirectory)
+        _parent = os.path.dirname(_project_root)
+        if _parent and os.path.exists(os.path.join(_parent, 'domain')):
+            if _parent not in sys.path:
+                sys.path.insert(0, _parent)
 
 # Load environment variables from .env file
 # This must be done before any other imports that might use environment variables

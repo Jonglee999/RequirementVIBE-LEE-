@@ -13,38 +13,90 @@ def _find_project_root():
     """Find the project root by looking for app.py or requirements.txt."""
     # Start from this file's directory
     current = os.path.abspath(__file__)
+    checked_paths = []
     
     # Go up the directory tree looking for project root markers
-    for _ in range(5):  # Max 5 levels up
+    for _ in range(6):  # Max 6 levels up (to handle /mount/src/requirementvibe structure)
         current = os.path.dirname(current)
+        checked_paths.append(current)
+        
         # Check for project root markers
-        if os.path.exists(os.path.join(current, 'app.py')) or \
-           os.path.exists(os.path.join(current, 'requirements.txt')):
-            # Verify it has the domain package
-            if os.path.exists(os.path.join(current, 'domain')):
+        has_app = os.path.exists(os.path.join(current, 'app.py'))
+        has_requirements = os.path.exists(os.path.join(current, 'requirements.txt'))
+        has_domain = os.path.exists(os.path.join(current, 'domain'))
+        
+        if (has_app or has_requirements) and has_domain:
+            # Double-check: verify domain/conversations exists
+            if os.path.exists(os.path.join(current, 'domain', 'conversations')):
                 return current
     
     # Fallback: calculate from file path (presentation/pages/auth.py -> project_root)
-    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    fallback = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return fallback
 
 # Find and add project root to sys.path
 _project_root = _find_project_root()
-if _project_root and _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
+
+# Add project root and all possible parent directories to sys.path
+_paths_to_add = []
+if _project_root:
+    _paths_to_add.append(_project_root)
+    # Also try parent directories (for /mount/src/requirementvibe cases)
+    _current = _project_root
+    for _ in range(3):  # Check up to 3 levels up
+        _current = os.path.dirname(_current)
+        if _current and os.path.exists(os.path.join(_current, 'domain')):
+            _paths_to_add.append(_current)
+
+# Add all valid paths to sys.path
+for path in _paths_to_add:
+    if path and path not in sys.path:
+        sys.path.insert(0, path)
+
+# Also check current working directory and common Streamlit Cloud paths
+_cwd = os.getcwd()
+if _cwd and _cwd not in sys.path:
+    if os.path.exists(os.path.join(_cwd, 'domain')):
+        sys.path.insert(0, _cwd)
 
 import streamlit as st
 
-# Import with fallback for Streamlit Cloud compatibility
+# Import with multiple fallback attempts
 try:
     from domain.conversations.service import ConversationStorage
-except ModuleNotFoundError:
-    # Try adding parent directory if domain not found
-    _parent = os.path.dirname(_project_root) if _project_root else None
-    if _parent and _parent not in sys.path and os.path.exists(os.path.join(_parent, 'domain')):
-        sys.path.insert(0, _parent)
-        from domain.conversations.service import ConversationStorage
-    else:
-        raise
+except ModuleNotFoundError as e:
+    # Try to find domain package in sys.path
+    _found = False
+    for path in sys.path:
+        if not path:
+            continue
+        domain_path = os.path.join(path, 'domain', 'conversations')
+        if os.path.exists(domain_path):
+            # Try importing again
+            try:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(
+                    "domain.conversations.service",
+                    os.path.join(path, 'domain', 'conversations', 'service.py')
+                )
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    ConversationStorage = module.ConversationStorage
+                    _found = True
+                    break
+            except Exception:
+                continue
+    
+    if not _found:
+        # If all attempts fail, raise a more informative error
+        _relevant_paths = [p for p in sys.path[:10] if p and ('requirement' in p.lower() or 'mount' in p.lower() or 'src' in p.lower())]
+        raise ModuleNotFoundError(
+            f"Could not find 'domain.conversations' module. "
+            f"Project root found: {_project_root}. "
+            f"Relevant paths checked: {_relevant_paths}. "
+            f"Current file: {__file__}"
+        ) from e
 
 from application.email.service import get_email_service
 
