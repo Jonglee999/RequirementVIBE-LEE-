@@ -60,7 +60,13 @@ setup.ps1
 # Application data
 users.json
 application/users.json
-conversations/
+# Ignore root-level conversations folder (user data storage)
+/conversations/
+# Ignore user-specific conversation folders inside domain/conversations/ (e.g., Bryanwee)
+domain/conversations/*/
+# But keep the code files in domain/conversations/
+!domain/conversations/__init__.py
+!domain/conversations/service.py
 db/
 *.sqlite3
 *.db
