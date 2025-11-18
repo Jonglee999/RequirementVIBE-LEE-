@@ -8,6 +8,15 @@ This module contains the sidebar UI components including:
 - Conversation persistence settings
 """
 
+# Add project root to Python path for Streamlit Cloud compatibility
+import sys
+import os
+
+# Get the project root (parent of presentation/components)
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 import streamlit as st
 from domain.sessions.service import create_new_session, get_current_session, update_session_title
 from domain.conversations.service import ConversationStorage

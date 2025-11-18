@@ -4,6 +4,15 @@ Authentication Pages
 This module contains the login, registration, and password reset page components for the Streamlit application.
 """
 
+# Add project root to Python path for Streamlit Cloud compatibility
+import sys
+import os
+
+# Get the project root (parent of presentation/pages)
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 import streamlit as st
 from domain.conversations.service import ConversationStorage
 from application.email.service import get_email_service

@@ -15,10 +15,18 @@ Main Components:
 5. SRS Generation - Converts conversation history to IEEE 830 format documents
 """
 
+# Add project root to Python path for Streamlit Cloud compatibility
+import sys
+import os
+
+# Get the directory containing this file (app.py)
+_project_root = os.path.dirname(os.path.abspath(__file__))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 # Load environment variables from .env file
 # This must be done before any other imports that might use environment variables
 from dotenv import load_dotenv
-import os
 
 # Load .env file from project root directory (same directory as app.py)
 env_path = os.path.join(os.path.dirname(__file__), '.env')
