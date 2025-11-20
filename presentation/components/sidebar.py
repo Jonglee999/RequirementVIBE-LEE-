@@ -8,10 +8,13 @@ This module contains the sidebar UI components including:
 - Conversation persistence settings
 """
 
+from __future__ import annotations
+
 # Add project root to Python path for Streamlit Cloud compatibility
 # This MUST be done before any other imports
 import sys
 import os
+import base64
 
 def _find_project_root():
     """Find the project root by looking for app.py or requirements.txt."""
@@ -44,7 +47,31 @@ from core.models.memory import ShortTermMemory
 from domain.documents.srs import generate_ieee830_srs_from_conversation
 from infrastructure.llm.client import get_centralized_client
 from presentation.components.file_upload import render_file_upload
+from presentation.components.voice_input import render_voice_input
 from domain.prompts.service import load_role
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def _load_icon_base64(icon_path: str) -> str | None:
+    """Cache icon loading to avoid re-reading the file on every rerun."""
+    if not icon_path or not os.path.exists(icon_path):
+        return None
+
+    try:
+        with open(icon_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except Exception:
+        return None
+
+
+@st.cache_data(show_spinner=False, ttl=300)
+def _load_role_data(role_key: str) -> dict | None:
+    """Cache role definitions to minimize disk IO for repeated reruns."""
+    try:
+        role_data = load_role(role_key)
+        return role_data.model_dump()
+    except Exception:
+        return None
 
 
 def render_sidebar():
@@ -60,47 +87,23 @@ def render_sidebar():
     6. Conversation persistence settings
     """
     with st.sidebar:
-        # Header with icon
-        import os
-        
-        # Try to find and display the icon
-        # Get the project root directory (two levels up from this file)
-        current_dir = os.path.dirname(__file__)
-        project_root = os.path.dirname(os.path.dirname(current_dir))
-        icon_path = os.path.join(project_root, "RequirementVIBEICON.png")
-        
-        # Check if icon exists and display it
-        if os.path.exists(icon_path):
-            try:
-                # Read and encode the image as base64 for embedding in HTML
-                import base64
-                with open(icon_path, "rb") as img_file:
-                    img_data = base64.b64encode(img_file.read()).decode()
-                
-                # Display icon centered above text using HTML with base64 encoding
-                st.markdown(f"""
-                <div style='text-align: center; padding: 1rem 0 0.75rem 0; width: 100%;'>
-                    <img src="data:image/png;base64,{img_data}" style='width: 60px; height: 60px; display: block; margin: 0 auto;' />
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Display title below icon, centered
-                st.markdown("""
-                <div style='text-align: center; padding: 0.5rem 0 1.5rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 1rem;'>
-                    <h2 style='color: #ececf1; margin: 0; font-size: 1.5rem;'>UESTC-MBSE Requirement Assistant</h2>
-                    <p style='color: #8e8ea0; margin: 0.25rem 0 0 0; font-size: 0.85rem;'>AI Requirements Analyst</p>
-                </div>
-                """, unsafe_allow_html=True)
-            except Exception as e:
-                # Fallback if icon can't be loaded
-                st.markdown("""
-                <div style='padding: 1rem 0 1.5rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 1rem; text-align: center;'>
-                    <h2 style='color: #ececf1; margin: 0; font-size: 1.5rem;'>UESTC-MBSE Requirement Assistant</h2>
-                    <p style='color: #8e8ea0; margin: 0.25rem 0 0 0; font-size: 0.85rem;'>AI Requirements Analyst</p>
-                </div>
-                """, unsafe_allow_html=True)
+        icon_path = os.path.join(_project_root or os.path.dirname(os.path.dirname(__file__)), "RequirementVIBEICON.png")
+        icon_b64 = _load_icon_base64(icon_path)
+
+        if icon_b64:
+            st.markdown(f"""
+            <div style='text-align: center; padding: 1rem 0 0.75rem 0; width: 100%;'>
+                <img src="data:image/png;base64,{icon_b64}" style='width: 60px; height: 60px; display: block; margin: 0 auto;' />
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div style='text-align: center; padding: 0.5rem 0 1.5rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 1rem;'>
+                <h2 style='color: #ececf1; margin: 0; font-size: 1.5rem;'>UESTC-MBSE Requirement Assistant</h2>
+                <p style='color: #8e8ea0; margin: 0.25rem 0 0 0; font-size: 0.85rem;'>AI Requirements Analyst</p>
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            # Fallback if icon file doesn't exist
             st.markdown("""
             <div style='padding: 1rem 0 1.5rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 1rem; text-align: center;'>
                 <h2 style='color: #ececf1; margin: 0; font-size: 1.5rem;'>UESTC-MBSE Requirement Assistant</h2>
@@ -127,6 +130,9 @@ def render_sidebar():
         
         # File upload
         _render_file_upload()
+
+        # Voice input
+        render_voice_input()
         
         # Conversation persistence
         _render_conversation_persistence()
@@ -181,11 +187,11 @@ def _render_role_selection():
     
     # Load initial role if not already loaded
     if st.session_state.get("role_data") is None:
-        try:
-            role_data = load_role(current_role)
-            st.session_state.role_data = role_data.model_dump()
-        except Exception as e:
-            st.error(f"Failed to load initial role '{current_role}': {str(e)}")
+        cached_role = _load_role_data(current_role)
+        if cached_role:
+            st.session_state.role_data = cached_role
+        else:
+            st.error(f"Failed to load initial role '{current_role}'.")
     
     # Role selection selectbox
     selected_role = st.selectbox(
@@ -199,13 +205,13 @@ def _render_role_selection():
     # Check if role changed
     if selected_role != current_role:
         # Load the new role and store in session state
-        try:
-            role_data = load_role(selected_role)
+        role_data = _load_role_data(selected_role)
+        if role_data:
             st.session_state.selected_role = selected_role
-            st.session_state.role_data = role_data.model_dump()
+            st.session_state.role_data = role_data
             st.rerun()
-        except Exception as e:
-            st.error(f"Failed to load role '{selected_role}': {str(e)}")
+        else:
+            st.error(f"Failed to load role '{selected_role}'.")
     
     # Display current role info (use selected_role which may have been updated)
     active_role = st.session_state.get("selected_role", "analyst")

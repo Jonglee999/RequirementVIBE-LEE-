@@ -105,7 +105,7 @@ class _Completions:
         if streaming:
             def stream_generator() -> Generator[Dict[str, Any], None, None]:
                 try:
-                    with requests.post(
+                    with self.client.session.post(
                         url,
                         headers=self.client.headers,
                         json=payload,
@@ -158,7 +158,7 @@ class _Completions:
             return stream_generator()
         
         try:
-            response = requests.post(
+            response = self.client.session.post(
                 url, 
                 headers=self.client.headers, 
                 json=payload, 
@@ -261,6 +261,8 @@ class CentralizedLLMClient:
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
         # Initialize the chat interface (provides client.chat.completions.create())
         self.chat = _Chat(self)
 
@@ -324,7 +326,7 @@ def fetch_available_models(client: CentralizedLLMClient = None) -> Dict[str, Lis
         # Try to fetch models from /v1/models endpoint
         url = f"{client.base_url}/v1/models"
         # Use longer timeout (30 seconds) to handle slow API responses
-        response = requests.get(url, headers=client.headers, timeout=30)
+        response = client.session.get(url, headers=client.headers, timeout=30)
         response.raise_for_status()
         result = response.json()
         

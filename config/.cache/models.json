@@ -1,0 +1,17 @@
+{
+  "DeepSeek": [
+    "deepseek-v3.1"
+  ],
+  "GPT (OpenAI)": [
+    "gpt-5.1"
+  ],
+  "Claude (Anthropic)": [
+    "claude-sonnet-4-5-20250929"
+  ],
+  "Grok (xAI)": [
+    "grok-4.1"
+  ],
+  "Gemini (Google)": [
+    "gemini-2.5-flash"
+  ]
+}

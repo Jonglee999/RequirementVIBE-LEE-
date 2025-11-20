@@ -53,6 +53,7 @@ class ConversationStorage:
         self.storage_dir = storage_dir
         self.user_dir = os.path.join(storage_dir, username)
         self.sessions_file = os.path.join(self.user_dir, "sessions.json")
+        self._last_saved_signature: Optional[str] = None
 
         # Create user directory if it doesn't exist
         os.makedirs(self.user_dir, exist_ok=True)
@@ -155,8 +156,15 @@ class ConversationStorage:
                 if isinstance(session.get("created_at"), datetime):
                     session["created_at"] = session["created_at"].isoformat()
 
+            payload = json.dumps({"sessions": truncated_sessions}, indent=4, default=str)
+
+            if payload == self._last_saved_signature:
+                return True
+
             with open(self.sessions_file, 'w', encoding='utf-8') as f:
-                json.dump({"sessions": truncated_sessions}, f, indent=4, default=str)
+                f.write(payload)
+
+            self._last_saved_signature = payload
             return True
         except Exception as e:
             print(f"ERROR: Failed to save sessions for user {self.username}: {str(e)}")

@@ -105,6 +105,9 @@ def initialize_session_state():
     # pending_file_upload_message: Message to be added to chat from file upload
     if "pending_file_upload_message" not in st.session_state:
         st.session_state.pending_file_upload_message = None
+    # pending_voice_message: Message injected from voice transcription component
+    if "pending_voice_message" not in st.session_state:
+        st.session_state.pending_voice_message = None
     
     # GraphRAG State
     # graphrag_index: Serialized GraphRAG index dictionary

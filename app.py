@@ -457,6 +457,11 @@ if st.session_state.get("pending_file_upload_message") and not user_input:
     user_input = st.session_state.pending_file_upload_message
     st.session_state.pending_file_upload_message = None  # Clear after use
 
+# Handle pending voice transcription message (from voice input component)
+if st.session_state.get("pending_voice_message") and not user_input:
+    user_input = st.session_state.pending_voice_message
+    st.session_state.pending_voice_message = None
+
 # Handle user input when a message is submitted
 if user_input:
     # Add user message to memory immediately (for display and context)
