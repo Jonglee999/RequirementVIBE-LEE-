@@ -1,10 +1,9 @@
 """
 Voice infrastructure package.
 
-This namespace groups helpers that communicate with external
-speech-related services (e.g., transcription APIs). Keeping it
-isolated under infrastructure allows presentation components to
-stay framework-agnostic while still reusing the same HTTP client.
+This namespace groups helpers for local speech transcription using
+OpenAI Whisper models. The transcription runs entirely on-device,
+matching the implementation pattern from StreamlitaudioTest.
 """
 
 from .client import (

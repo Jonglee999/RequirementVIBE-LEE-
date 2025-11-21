@@ -241,7 +241,7 @@ def render_voice_input() -> None:
 
     st.caption(
         "Click the microphone once to start recording and click again to stop. "
-        "The clip is uploaded automatically for transcription (max 100MB)."
+        "The clip is automatically compressed and transcribed locally (max 100MB)."
     )
 
     audio_bytes = audio_recorder(

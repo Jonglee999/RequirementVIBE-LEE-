@@ -1,27 +1,27 @@
 """
-Voice transcription HTTP client.
+Local voice transcription client.
 
-This module encapsulates the logic for sending recorded audio to the
-external transcription API documented in
-`StreamlitaudioTest/api_service/docs/API_USAGE.md`.
+This module provides local speech-to-text transcription using OpenAI Whisper models.
+It replaces the external HTTP API with on-device processing, matching the
+implementation pattern from StreamlitaudioTest/streamlit_app/app.py.
 
-Keeping this logic in the infrastructure layer helps us:
-- Reuse the same request/validation flow from different UI surfaces
-- Swap or reconfigure the transcription backend via environment variables
-- Centralize size validation so the UI stays lean
+The service uses Streamlit's resource cache to load Whisper models once per session,
+reducing memory overhead and startup time for subsequent transcriptions.
 """
 
 from __future__ import annotations
 
-import io
-import mimetypes
 import os
+import tempfile
 from dataclasses import dataclass
 from typing import Optional
 
-import requests
+from .whisper_service import (
+    WhisperServiceError,
+    transcribe_audio_file as _transcribe_audio_file,
+)
 
-# API contract caps uploads at 100MB
+# File size limit for recordings (100MB)
 MAX_AUDIO_FILE_SIZE_MB = 100
 MAX_AUDIO_FILE_SIZE_BYTES = MAX_AUDIO_FILE_SIZE_MB * 1024 * 1024
 
@@ -50,16 +50,15 @@ def _get_env(key: str, default: Optional[str] = None) -> Optional[str]:
 
 def get_transcription_api_base_url() -> str:
     """
-    Return the base URL that hosts the `/api/transcribe` endpoint.
+    Return a placeholder URL (not used for local transcription).
 
-    Defaults to the local FastAPI service if no env var is set.
+    Kept for backward compatibility with existing code that may reference this.
     """
-    base_url = _get_env("VOICE_TRANSCRIBE_API_BASE_URL", "http://192.168.31.200:8000")
-    return base_url.rstrip("/")
+    return "local://whisper"
 
 
 def get_default_model() -> str:
-    """Return the Whisper model name to request."""
+    """Return the Whisper model name to use."""
     return _get_env("VOICE_TRANSCRIBE_MODEL", "medium") or "medium"
 
 
@@ -67,37 +66,19 @@ def get_default_language() -> str:
     """
     Return the ISO-639-1 language code hint.
 
-    The API accepts an empty string / None to auto-detect, so we keep the
-    default empty.
+    Empty string means auto-detect (Whisper default).
     """
     return _get_env("VOICE_TRANSCRIBE_LANGUAGE", "") or ""
 
 
 def get_default_temperature() -> float:
-    """Return the sampling temperature to send to the transcription API."""
+    """Return the sampling temperature for Whisper transcription."""
     raw = _get_env("VOICE_TRANSCRIBE_TEMPERATURE", "0.1")
     try:
         value = float(raw)
     except (TypeError, ValueError):
-        value = 0.0
+        value = 0.1
     return max(0.0, min(1.0, value))
-
-
-def _guess_mime_type(filename: str) -> str:
-    """Guess content type for the multipart request."""
-    mime_type, _ = mimetypes.guess_type(filename)
-    if mime_type is None:
-        # Fall back to audio/wav which is the default output format from
-        # audio-recorder-streamlit.
-        return "audio/wav"
-    return mime_type
-
-
-def _safe_filename(filename: Optional[str]) -> str:
-    """Prevent directory traversal and provide a deterministic fallback."""
-    if not filename:
-        return "recording.wav"
-    return os.path.basename(filename)
 
 
 def transcribe_audio_bytes(
@@ -107,18 +88,27 @@ def transcribe_audio_bytes(
     model: Optional[str] = None,
     language: Optional[str] = None,
     temperature: Optional[float] = None,
-    timeout: int = 120,
+    timeout: Optional[int] = None,  # Not used for local transcription, kept for compatibility
 ) -> TranscriptionResponse:
     """
-    Send audio bytes to the transcription backend and return the parsed text.
+    Transcribe audio bytes using local Whisper models.
+
+    This function writes the audio bytes to a temporary file, then uses
+    Whisper to transcribe it locally. The temporary file is automatically
+    cleaned up after transcription.
 
     Args:
         file_bytes: Raw audio payload captured from the recorder.
-        filename: Suggested filename (only used for metadata/MIME detection).
-        model: Optional Whisper model. Defaults to env-configured value.
-        language: Optional ISO-639-1 language hint.
-        temperature: Optional sampling temperature.
-        timeout: HTTP timeout in seconds for the outbound request.
+        filename: Suggested filename (used to determine file extension).
+        model: Optional Whisper model. Defaults to "medium".
+        language: Optional ISO-639-1 language hint (empty string = auto-detect).
+        temperature: Optional sampling temperature (default: 0.1).
+
+    Returns:
+        TranscriptionResponse containing the transcribed text and metadata.
+
+    Raises:
+        VoiceTranscriptionError: If transcription fails for any reason.
     """
     if not file_bytes:
         raise VoiceTranscriptionError("No audio payload provided for transcription.")
@@ -127,57 +117,54 @@ def transcribe_audio_bytes(
         size_mb = len(file_bytes) / (1024 * 1024)
         raise VoiceTranscriptionError(
             f"Recording is {size_mb:.2f}MB which exceeds the "
-            f"{MAX_AUDIO_FILE_SIZE_MB}MB limit enforced by the transcription API."
+            f"{MAX_AUDIO_FILE_SIZE_MB}MB limit."
         )
 
-    base_url = get_transcription_api_base_url()
-    url = f"{base_url}/api/transcribe"
+    # Determine file extension from filename
+    file_ext = os.path.splitext(filename)[1] if filename else ".wav"
+    if not file_ext or file_ext == ".":
+        file_ext = ".wav"
 
-    payload_model = model or get_default_model()
-    payload_language = language or get_default_language()
-    payload_temperature = (
+    # Use configured defaults
+    model_name = model or get_default_model()
+    language_hint = language if language is not None else get_default_language()
+    temp_value = (
         get_default_temperature() if temperature is None else float(temperature)
     )
 
-    files = {
-        "file": (
-            _safe_filename(filename),
-            io.BytesIO(file_bytes),
-            _guess_mime_type(filename),
-        )
-    }
-
-    data = {
-        "model": payload_model,
-        "temperature": str(payload_temperature),
-    }
-
-    if payload_language:
-        data["language"] = payload_language
-
+    # Write audio bytes to temporary file for Whisper processing
+    temp_file_path = None
     try:
-        response = requests.post(url, files=files, data=data, timeout=timeout)
-    except requests.RequestException as exc:
-        raise VoiceTranscriptionError(
-            f"Failed to reach transcription service at {url}: {exc}"
-        ) from exc
+        with tempfile.NamedTemporaryFile(
+            suffix=file_ext, delete=False
+        ) as temp_file:
+            temp_file.write(file_bytes)
+            temp_file_path = temp_file.name
 
-    try:
-        payload = response.json()
-    except ValueError as exc:
-        raise VoiceTranscriptionError(
-            "Transcription service returned a non-JSON response."
-        ) from exc
+        # Perform local transcription
+        try:
+            transcribed_text = _transcribe_audio_file(
+                audio_file_path=temp_file_path,
+                model_name=model_name,
+                language=language_hint if language_hint else None,
+                temperature=temp_value,
+            )
+        except WhisperServiceError as exc:
+            raise VoiceTranscriptionError(str(exc)) from exc
 
-    if response.status_code != 200 or not payload.get("success"):
-        error_msg = payload.get("error") if isinstance(payload, dict) else str(payload)
-        raise VoiceTranscriptionError(
-            f"Transcription request failed ({response.status_code}): {error_msg}"
+        # Return response in the same format as the HTTP API
+        return TranscriptionResponse(
+            text=transcribed_text,
+            model_used=model_name,
+            language=language_hint if language_hint else None,
         )
 
-    return TranscriptionResponse(
-        text=payload.get("transcription", ""),
-        model_used=payload.get("model_used", payload_model),
-        language=payload.get("language", payload_language or None),
-    )
+    finally:
+        # Clean up temporary file
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+            except OSError:
+                # Ignore cleanup errors
+                pass
 

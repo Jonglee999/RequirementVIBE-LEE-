@@ -1,5 +1,7 @@
 streamlit>=1.28.0
 audio-recorder-streamlit>=0.0.8
+openai-whisper>=20231117  # Local speech transcription
+torch>=2.0.0  # Required by Whisper
 requests>=2.31.0  # Required for centralized LLM API and Unstructured API
 urllib3>=2.0.0  # Required for SSL handling and retry logic
 unstructured-client>=0.22.0  # Official Unstructured API Python SDK
