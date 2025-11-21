@@ -7,12 +7,17 @@ implementation pattern from StreamlitaudioTest/streamlit_app/app.py.
 
 The service uses Streamlit's resource cache to load Whisper models once per session,
 reducing memory overhead and startup time for subsequent transcriptions.
+
+Models are first checked in the project's models/whisper/ directory. If found,
+they are used directly without downloading. Otherwise, Whisper will download
+the model to the default cache location.
 """
 
 from __future__ import annotations
 
 import os
 import shutil
+from pathlib import Path
 from typing import Optional
 
 import streamlit as st
@@ -28,6 +33,38 @@ except ImportError:
 
 class WhisperServiceError(RuntimeError):
     """Raised when Whisper transcription fails."""
+
+
+def _get_project_root() -> Path:
+    """
+    Find the project root directory by looking for app.py or requirements.txt.
+
+    Returns:
+        Path to the project root directory.
+    """
+    current = Path(__file__).resolve()
+    
+    # Look for project root markers (app.py or requirements.txt)
+    for _ in range(6):  # Max 6 levels up
+        if (current / "app.py").exists() or (current / "requirements.txt").exists():
+            # Verify it has the infrastructure package
+            if (current / "infrastructure").exists():
+                return current
+        current = current.parent
+    
+    # Fallback: use directory containing this file, go up to project root
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def _get_local_models_dir() -> Path:
+    """
+    Get the path to the local Whisper models directory.
+
+    Returns:
+        Path to models/whisper/ directory in the project root.
+    """
+    project_root = _get_project_root()
+    return project_root / "models" / "whisper"
 
 
 def ensure_ffmpeg_available() -> str:
@@ -53,9 +90,12 @@ def _load_whisper_model(model_name: str):
     """
     Load a Whisper model using Streamlit's resource cache.
 
-    Models are downloaded and loaded once per session, then reused for
-    subsequent transcriptions. This significantly reduces memory usage
-    and startup time.
+    This function first checks for a local model file in models/whisper/
+    directory. If found, it uses that model directly. Otherwise, it falls
+    back to Whisper's default behavior (downloads to cache).
+
+    Models are loaded once per session, then reused for subsequent
+    transcriptions. This significantly reduces memory usage and startup time.
 
     Args:
         model_name: Name of the Whisper model (tiny, base, small, medium, large-v2).
@@ -72,7 +112,18 @@ def _load_whisper_model(model_name: str):
         )
 
     try:
-        return whisper.load_model(model_name)
+        # Check for local model in project directory
+        local_models_dir = _get_local_models_dir()
+        local_model_path = local_models_dir / f"{model_name}.pt"
+        
+        # Use local model if it exists, otherwise let Whisper download
+        if local_model_path.exists():
+            # Load from local directory
+            return whisper.load_model(model_name, download_root=str(local_models_dir))
+        else:
+            # Fall back to default behavior (downloads to ~/.cache/whisper/)
+            return whisper.load_model(model_name)
+            
     except Exception as exc:
         raise WhisperServiceError(
             f"Failed to load Whisper model '{model_name}': {exc}"

@@ -1,0 +1,6 @@
+# Git LFS configuration for Whisper model files
+# These files are large (>100MB) and need Git LFS to be stored in the repository
+
+# Whisper model files (typically 1.4GB for medium model)
+models/whisper/*.pt filter=lfs diff=lfs merge=lfs -text
+

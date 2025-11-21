@@ -1,0 +1,7 @@
+# This directory contains Whisper model files
+# 
+# To add the medium model:
+# 1. Download it using: python scripts/download_whisper_model.py
+# 2. The model file (medium.pt) will be stored here
+# 3. Commit it using Git LFS (see .gitattributes)
+
