@@ -34,16 +34,22 @@ git lfs install
 
 ### 2. Download the Model
 
-Run the download script to download the medium Whisper model:
+Run the download script to download the base Whisper model (default):
 
 ```bash
-python scripts/download_whisper_model.py medium
+python scripts/download_whisper_model.py base
+```
+
+Or simply run without arguments (defaults to base):
+
+```bash
+python scripts/download_whisper_model.py
 ```
 
 This will:
-- Download the medium model (~1.4GB)
-- Save it to `models/whisper/medium.pt`
-- Take several minutes depending on your internet connection
+- Download the base model (~150MB)
+- Save it to `models/whisper/base.pt`
+- Take a few minutes depending on your internet connection
 
 ### 3. Commit the Model to Git
 
@@ -51,10 +57,10 @@ After downloading, commit the model file using Git LFS:
 
 ```bash
 # Add the model file (Git LFS will handle it automatically)
-git add models/whisper/medium.pt
+git add models/whisper/base.pt
 
 # Commit
-git commit -m "Add Whisper medium model for local use"
+git commit -m "Add Whisper base model for local use"
 
 # Push to GitHub
 git push
@@ -69,15 +75,17 @@ After deploying to Streamlit Cloud:
 
 ## Model Files
 
-- `medium.pt` - Medium Whisper model (~1.4GB, recommended for good accuracy/speed balance)
+- `base.pt` - Base Whisper model (~150MB, default - good balance of accuracy and speed)
 
 ## Notes
 
 - The model files are tracked by Git LFS, so they won't bloat your repository
 - If you need a different model size, you can download it using the same script:
   ```bash
-  python scripts/download_whisper_model.py base    # Smaller, faster
-  python scripts/download_whisper_model.py large-v2  # Larger, more accurate
+  python scripts/download_whisper_model.py tiny     # Smallest, fastest (~75MB)
+  python scripts/download_whisper_model.py base     # Default (~150MB)
+  python scripts/download_whisper_model.py medium    # Larger, more accurate (~1.4GB)
+  python scripts/download_whisper_model.py large-v2 # Largest, most accurate (~3GB)
   ```
 - The code will automatically check this directory first before downloading
 

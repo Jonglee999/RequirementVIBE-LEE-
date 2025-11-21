@@ -132,7 +132,7 @@ def _load_whisper_model(model_name: str):
 
 def transcribe_audio_file(
     audio_file_path: str,
-    model_name: str = "medium",
+    model_name: str = "base",
     language: Optional[str] = None,
     temperature: float = 0.1,
 ) -> str:
@@ -145,7 +145,7 @@ def transcribe_audio_file(
 
     Args:
         audio_file_path: Path to the audio file to transcribe.
-        model_name: Whisper model to use (default: "medium").
+        model_name: Whisper model to use (default: "base").
         language: Optional ISO-639-1 language code (e.g., "en", "zh").
                   If None, Whisper will auto-detect the language.
         temperature: Sampling temperature between 0 and 1 (default: 0.1).

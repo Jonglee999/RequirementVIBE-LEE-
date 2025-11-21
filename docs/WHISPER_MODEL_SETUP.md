@@ -4,8 +4,8 @@ This guide explains how to pre-download and commit the Whisper model to avoid do
 
 ## Problem
 
-When deploying to Streamlit Cloud, the first transcription request triggers a download of the Whisper medium model (~1.4GB), which can:
-- Cause timeouts or errors
+When deploying to Streamlit Cloud, the first transcription request triggers a download of the Whisper base model (~150MB), which can:
+- Cause timeouts or errors on slower connections
 - Slow down the first user experience
 - Consume bandwidth unnecessarily
 
@@ -40,16 +40,22 @@ git lfs install
 
 ### 2. Download the Model
 
-Run the download script:
+Run the download script (defaults to base model):
 
 ```bash
-python scripts/download_whisper_model.py medium
+python scripts/download_whisper_model.py base
+```
+
+Or simply run without arguments:
+
+```bash
+python scripts/download_whisper_model.py
 ```
 
 This will:
-- Download the medium Whisper model (~1.4GB)
-- Save it to `models/whisper/medium.pt`
-- Take 5-15 minutes depending on your internet speed
+- Download the base Whisper model (~150MB)
+- Save it to `models/whisper/base.pt`
+- Take 2-5 minutes depending on your internet speed
 
 ### 3. Commit and Push
 
@@ -57,17 +63,17 @@ Add the model file to Git (Git LFS will handle it automatically):
 
 ```bash
 # Stage the model file
-git add models/whisper/medium.pt
+git add models/whisper/base.pt
 git add .gitattributes  # If not already committed
 
 # Commit
-git commit -m "Add Whisper medium model for local use on Streamlit Cloud"
+git commit -m "Add Whisper base model for local use on Streamlit Cloud"
 
 # Push to GitHub
 git push
 ```
 
-**Note:** The first push may take longer as Git LFS uploads the large file.
+**Note:** The first push may take a bit longer as Git LFS uploads the model file (~150MB).
 
 ### 4. Verify on Streamlit Cloud
 
@@ -79,7 +85,7 @@ After deploying:
 ## How It Works
 
 The code in `infrastructure/voice/whisper_service.py`:
-1. First checks for `models/whisper/medium.pt` in the project
+1. First checks for `models/whisper/base.pt` in the project
 2. If found, loads it directly (no download)
 3. If not found, falls back to Whisper's default behavior (downloads to cache)
 
@@ -98,7 +104,7 @@ git lfs track "models/whisper/*.pt"
 
 # Re-add the file
 git add .gitattributes
-git add models/whisper/medium.pt
+git add models/whisper/base.pt
 git commit -m "Configure Git LFS for Whisper models"
 ```
 
@@ -116,16 +122,22 @@ If the model isn't found after deployment:
 - Ensure Git LFS files were uploaded (GitHub shows LFS badge on large files)
 - Check Streamlit Cloud build logs for any errors
 
-## Alternative: Use Smaller Model
+## Alternative: Use Different Model Sizes
 
-If you want faster downloads or smaller repository size, you can use a smaller model:
+If you want different accuracy/speed trade-offs, you can use other models:
 
 ```bash
-# Download base model (~150MB, faster but less accurate)
+# Tiny model (~75MB, fastest but least accurate)
+python scripts/download_whisper_model.py tiny
+
+# Base model (~150MB, default - good balance)
 python scripts/download_whisper_model.py base
 
-# Or tiny model (~75MB, fastest but least accurate)
-python scripts/download_whisper_model.py tiny
+# Medium model (~1.4GB, more accurate but slower)
+python scripts/download_whisper_model.py medium
+
+# Large model (~3GB, most accurate but slowest)
+python scripts/download_whisper_model.py large-v2
 ```
 
 Then update the default model in `infrastructure/voice/client.py` if needed.
@@ -138,7 +150,7 @@ After setup, your repository will have:
 RequirenebtVIBE/
 ├── models/
 │   └── whisper/
-│       ├── medium.pt      # Model file (tracked by Git LFS)
+│       ├── base.pt        # Model file (tracked by Git LFS)
 │       └── README.md      # Documentation
 ├── scripts/
 │   └── download_whisper_model.py  # Download script

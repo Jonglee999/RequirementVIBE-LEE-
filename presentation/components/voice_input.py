@@ -34,7 +34,7 @@ from infrastructure.voice import (
     transcribe_audio_bytes,
 )
 
-VOICE_MODEL_ID = "medium"
+VOICE_MODEL_ID = "base"
 VOICE_TEMPERATURE = 0.1
 DEFAULT_LANGUAGE_HINT = ""
 COMPRESSED_SAMPLE_RATE = 16000

@@ -9,8 +9,8 @@ Usage:
     python scripts/download_whisper_model.py [model_name]
 
 Examples:
-    python scripts/download_whisper_model.py medium
-    python scripts/download_whisper_model.py base
+    python scripts/download_whisper_model.py base    # Default model
+    python scripts/download_whisper_model.py medium # Larger, more accurate
 """
 
 import sys
@@ -28,7 +28,7 @@ except ImportError:
     sys.exit(1)
 
 
-def download_model(model_name: str = "medium"):
+def download_model(model_name: str = "base"):
     """
     Download a Whisper model to the local models/whisper/ directory.
 
@@ -74,7 +74,7 @@ def download_model(model_name: str = "medium"):
 
 if __name__ == "__main__":
     # Get model name from command line or use default
-    model_name = sys.argv[1] if len(sys.argv) > 1 else "medium"
+    model_name = sys.argv[1] if len(sys.argv) > 1 else "base"
     
     # Validate model name
     valid_models = ["tiny", "base", "small", "medium", "large-v2"]

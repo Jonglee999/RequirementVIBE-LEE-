@@ -59,7 +59,7 @@ def get_transcription_api_base_url() -> str:
 
 def get_default_model() -> str:
     """Return the Whisper model name to use."""
-    return _get_env("VOICE_TRANSCRIBE_MODEL", "medium") or "medium"
+    return _get_env("VOICE_TRANSCRIBE_MODEL", "base") or "base"
 
 
 def get_default_language() -> str:
@@ -100,7 +100,7 @@ def transcribe_audio_bytes(
     Args:
         file_bytes: Raw audio payload captured from the recorder.
         filename: Suggested filename (used to determine file extension).
-        model: Optional Whisper model. Defaults to "medium".
+        model: Optional Whisper model. Defaults to "base".
         language: Optional ISO-639-1 language hint (empty string = auto-detect).
         temperature: Optional sampling temperature (default: 0.1).
 
