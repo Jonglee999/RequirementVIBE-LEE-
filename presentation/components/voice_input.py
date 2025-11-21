@@ -149,8 +149,10 @@ def _handle_new_audio(audio_bytes: bytes) -> None:
 
     compressed_bytes = audio_bytes
     extension = ".wav"
+    compression_successful = False
+    
     try:
-        with st.spinner("Compressing voice input for faster upload..."):
+        with st.spinner("Compressing voice input for faster processing..."):
             compressed_bytes = compress_audio(
                 audio_bytes,
                 target_sample_rate=COMPRESSED_SAMPLE_RATE,
@@ -158,12 +160,29 @@ def _handle_new_audio(audio_bytes: bytes) -> None:
                 output_format="mp3",
             )
             extension = COMPRESSED_EXTENSION
+            compression_successful = True
             st.session_state.voice_status = "Recording compressed and captured"
     except AudioCompressionError as exc:
-        st.session_state.voice_transcription_error = None
-        st.session_state.voice_status = (
-            f"Compression unavailable ({exc}). Using original audio."
-        )
+        # If MP3 compression fails, try WAV as fallback (better compatibility)
+        try:
+            with st.spinner("Compressing to WAV format (better compatibility)..."):
+                compressed_bytes = compress_audio(
+                    audio_bytes,
+                    target_sample_rate=COMPRESSED_SAMPLE_RATE,
+                    bitrate=COMPRESSED_BITRATE,
+                    output_format="wav",
+                )
+                extension = ".wav"
+                compression_successful = True
+                st.session_state.voice_status = "Recording compressed (WAV format)"
+        except AudioCompressionError:
+            # If both fail, use original audio (Whisper can handle various formats)
+            st.session_state.voice_transcription_error = None
+            st.session_state.voice_status = (
+                "Compression unavailable. Using original audio format."
+            )
+            # Keep original audio bytes and extension
+            extension = ".wav"  # Default extension for audio-recorder-streamlit output
 
     _persist_recording(compressed_bytes, extension)
     _auto_transcribe_current_recording()

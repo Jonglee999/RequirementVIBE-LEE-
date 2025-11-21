@@ -120,11 +120,6 @@ def transcribe_audio_bytes(
             f"{MAX_AUDIO_FILE_SIZE_MB}MB limit."
         )
 
-    # Determine file extension from filename
-    file_ext = os.path.splitext(filename)[1] if filename else ".wav"
-    if not file_ext or file_ext == ".":
-        file_ext = ".wav"
-
     # Use configured defaults
     model_name = model or get_default_model()
     language_hint = language if language is not None else get_default_language()
@@ -132,11 +127,40 @@ def transcribe_audio_bytes(
         get_default_temperature() if temperature is None else float(temperature)
     )
 
-    # Write audio bytes to temporary file for Whisper processing
+    # Determine if we need to convert the audio format
+    # Whisper/FFmpeg handles WAV more reliably, especially for mobile-recorded audio
+    # If the input is MP3 or another format, we'll convert it to WAV for transcription
+    file_ext = os.path.splitext(filename)[1].lower() if filename else ".wav"
+    if not file_ext or file_ext == ".":
+        file_ext = ".wav"
+    
+    # Use WAV for transcription (most compatible format)
+    # This avoids FFmpeg seeking issues with MP3 files, especially from mobile devices
+    transcription_ext = ".wav"
+    needs_conversion = file_ext not in [".wav", ".wave"]
+    
     temp_file_path = None
     try:
+        if needs_conversion:
+            # Convert to WAV format for better compatibility
+            from .processing import compress_audio, AudioCompressionError
+            
+            try:
+                # Convert to WAV format (no compression, just format conversion)
+                wav_bytes = compress_audio(
+                    file_bytes,
+                    target_sample_rate=16000,
+                    bitrate="128k",  # Higher bitrate for WAV (uncompressed)
+                    output_format="wav",
+                )
+                file_bytes = wav_bytes
+            except AudioCompressionError:
+                # If conversion fails, try original format
+                pass
+        
+        # Write audio bytes to temporary file for Whisper processing
         with tempfile.NamedTemporaryFile(
-            suffix=file_ext, delete=False
+            suffix=transcription_ext, delete=False
         ) as temp_file:
             temp_file.write(file_bytes)
             temp_file_path = temp_file.name
