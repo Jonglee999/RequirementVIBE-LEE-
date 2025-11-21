@@ -70,32 +70,74 @@ RequirenebtVIBE/
 - The `.streamlit/config.toml` file is optional but recommended for better app configuration.
 - The `openai` package in requirements.txt is required because DeepSeek API uses an OpenAI-compatible SDK.
 
+## Voice Transcription Model (Git LFS)
+
+The Whisper **base** model (~150 MB) is stored in `models/whisper/base.pt` via Git LFS so Streamlit Cloud can start recording immediately.
+
+### Download or refresh the model locally
+
+```bash
+python scripts/download_whisper_model.py    # defaults to base
+```
+
+### Commit the model with Git LFS
+
+```bash
+git lfs install                      # once per machine
+git add models/whisper/base.pt .gitattributes
+git commit -m "Add Whisper base model for Streamlit"
+git push origin main
+```
+
+If you would rather download on first run, remove it from Git tracking:
+
+```bash
+git rm --cached models/whisper/base.pt
+git commit -m "Let Whisper download model at runtime"
+git push origin main
+```
+
 ## Troubleshooting
 
-### App fails to deploy
-- Check that `app.py` is in the root directory
-- Verify `requirements.txt` has all dependencies
-- Check the logs in Streamlit Cloud dashboard
+### Repository fails to clone
+
+1. Double-check the repository and branch names in Streamlit Cloud (case-sensitive)
+2. Ensure Git LFS objects are uploaded:
+   ```bash
+   git lfs push origin main --all
+   git push origin main
+   ```
+3. Re-authorize Streamlit Cloud to access your GitHub account if prompted
 
 ### API key not working
-- Verify the secret is set correctly in Streamlit Cloud
-- Check that the secret name matches `DEEPSEEK_API_KEY`
-- Ensure there are no extra spaces or quotes in the secret value
+- Verify the secret is set correctly in Streamlit Cloud (`DEEPSEEK_API_KEY`)
+- Remove extra quotes or whitespace around the key
+- Restart the app after updating secrets
+
+### Voice model download hangs
+- Confirm `models/whisper/base.pt` exists in GitHub (if using the preloaded model)
+- Otherwise expect the first transcription to take a few minutes while Whisper downloads the base model on Streamlit Cloud
 
 ### App loads but shows error
 - Check the app logs in Streamlit Cloud
-- Verify the API key is valid
-- Ensure the DeepSeek API is accessible from Streamlit Cloud servers
+- Ensure all dependencies are listed in `requirements.txt`
+- Verify the DeepSeek API is reachable from Streamlit servers
 
 ## Environment Variables
 
-The app uses the following environment variable:
-- `DEEPSEEK_API_KEY`: Your DeepSeek API key (set via Streamlit Cloud Secrets)
+At minimum set:
+
+| Variable | Where to set | Purpose |
+|----------|--------------|---------|
+| `DEEPSEEK_API_KEY` | Streamlit Cloud → Secrets | LLM access |
+| `CENTRALIZED_LLM_API_KEY` | `.env` or Secrets | Gateway key (if different from DeepSeek) |
+| `UNSTRUCTURED_API_KEY` | `.env` or Secrets | Document processing |
+| `VOICE_TRANSCRIBE_*` | Optional | Override Whisper defaults |
 
 ## Custom Domain (Optional)
 
 Streamlit Cloud allows you to use a custom domain:
 1. Go to app settings
 2. Navigate to "Custom domain"
-3. Follow the instructions to configure your domain
+3. Follow the instructions to configure DNS
 

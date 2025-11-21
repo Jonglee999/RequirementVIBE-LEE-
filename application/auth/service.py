@@ -153,7 +153,7 @@ class AuthManager:
             "password_hash": password_hash,
             "email": email,
             "created_at": datetime.now().isoformat(),
-            "last_login": None
+            "last_login": None,
         }
         
         # Save user to database
@@ -225,6 +225,28 @@ class AuthManager:
         users = self._load_users()
         return username in users
     
+    def get_user_profile(self, username: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve sanitized user data (without password hash).
+        
+        Args:
+            username: Username to fetch
+        
+        Returns:
+            Optional dictionary containing user profile fields.
+        """
+        users = self._load_users()
+        user_data = users.get(username)
+        if not user_data:
+            return None
+        
+        return {
+            "username": user_data.get("username", username),
+            "email": user_data.get("email"),
+            "created_at": user_data.get("created_at"),
+            "last_login": user_data.get("last_login"),
+        }
+
     def reset_password(self, username: str, new_password: str) -> Tuple[bool, str]:
         """
         Reset a user's password.

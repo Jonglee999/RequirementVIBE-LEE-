@@ -15,7 +15,6 @@ from __future__ import annotations
 import sys
 import os
 import base64
-
 def _find_project_root():
     """Find the project root by looking for app.py or requirements.txt."""
     # Start from this file's directory
@@ -40,16 +39,16 @@ if _project_root and _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import streamlit as st
+
 from domain.sessions.service import create_new_session, get_current_session, update_session_title
 from domain.conversations.service import ConversationStorage
-from config.models import ALL_MODELS, AVAILABLE_MODELS
+from config.models import ALL_MODELS
 from core.models.memory import ShortTermMemory
 from domain.documents.srs import generate_ieee830_srs_from_conversation
 from infrastructure.llm.client import get_centralized_client
 from presentation.components.file_upload import render_file_upload
 from presentation.components.voice_input import render_voice_input
 from domain.prompts.service import load_role
-
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def _load_icon_base64(icon_path: str) -> str | None:
@@ -87,6 +86,7 @@ def render_sidebar():
     6. Conversation persistence settings
     """
     with st.sidebar:
+        
         icon_path = os.path.join(_project_root or os.path.dirname(os.path.dirname(__file__)), "RequirementVIBEICON.png")
         icon_b64 = _load_icon_base64(icon_path)
 
@@ -113,8 +113,11 @@ def render_sidebar():
         
         st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
         
-        # User info and logout
-        _render_user_info()
+        # Authentication controls now live in the sidebar
+        _render_auth_controls()
+        
+        if not st.session_state.authenticated:
+            return
         
         # Role selection
         _render_role_selection()
@@ -138,11 +141,129 @@ def render_sidebar():
         _render_conversation_persistence()
 
 
+def _render_auth_controls():
+    """
+    Render login/register controls inside the sidebar.
+    
+    This function handles:
+    1. Login form for manual authentication
+    2. Registration form
+    3. Password reset hints
+    """
+    st.markdown("<div style='margin-bottom: 1rem;'><h3 style='color: #8e8ea0; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>Account</h3></div>", unsafe_allow_html=True)
+
+    if st.session_state.authenticated and st.session_state.current_user:
+        _render_user_info()
+        return
+
+    if st.session_state.get("sidebar_login_prompt"):
+        st.warning("Please log in to start chatting.")
+
+    with st.form("sidebar_login_form"):
+        username = st.text_input("Username", key="sidebar_login_username")
+        password = st.text_input("Password", type="password", key="sidebar_login_password")
+        submit = st.form_submit_button("Sign In", use_container_width=True, type="primary")
+
+        if submit:
+            if not username or not password:
+                st.error("Please enter both username and password.")
+            else:
+                success, message, user_data = st.session_state.auth_manager.login_user(username, password)
+                if success and user_data:
+                    _finalize_login(user_data)
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+
+    with st.expander("Need an account?"):
+        _render_registration_panel()
+
+    with st.expander("Forgot password?"):
+        _render_password_reset_hint()
+
+
+def _finalize_login(user_data):
+    """
+    Finalize login state and load conversations.
+    
+    Args:
+        user_data: Dictionary containing user information (username, email, etc.)
+    """
+    st.session_state.authenticated = True
+    st.session_state.current_user = user_data
+    st.session_state.sidebar_login_prompt = False
+
+    username = user_data.get("username")
+
+    if username:
+        st.session_state.conversation_storage = ConversationStorage(username)
+    loaded_sessions = st.session_state.conversation_storage.load_sessions() if st.session_state.conversation_storage else {}
+
+    if loaded_sessions:
+        st.session_state.sessions = loaded_sessions
+        st.session_state.session_counter = len(loaded_sessions)
+
+        sorted_sessions = sorted(
+            st.session_state.sessions.values(),
+            key=lambda x: x.get("created_at", ""),
+            reverse=True,
+        )
+        if sorted_sessions:
+            most_recent_session = sorted_sessions[0]
+            st.session_state.current_session_id = most_recent_session.get("id")
+            if most_recent_session.get("messages"):
+                st.session_state.memory.load_messages(most_recent_session["messages"], reset=True)
+            if most_recent_session.get("model"):
+                st.session_state.selected_model = most_recent_session["model"]
+    else:
+        st.session_state.sessions = {}
+        st.session_state.current_session_id = None
+
+    st.toast(f"Signed in as {user_data.get('username')}", icon="✅")
+
+
+def _render_registration_panel():
+    """Inline registration form."""
+    with st.form("sidebar_register_form"):
+        email = st.text_input("Email", key="sidebar_register_email")
+        username = st.text_input("Username", key="sidebar_register_username")
+        password = st.text_input("Password", type="password", key="sidebar_register_password")
+        confirm_password = st.text_input("Confirm Password", type="password", key="sidebar_register_confirm")
+        submit = st.form_submit_button("Create Account", use_container_width=True)
+
+        if submit:
+            if not email or not username or not password:
+                st.error("All fields are required.")
+            elif len(password) < 6:
+                st.error("Password must be at least 6 characters long.")
+            elif password != confirm_password:
+                st.error("Passwords do not match.")
+            else:
+                success, message = st.session_state.auth_manager.register_user(username, password, email)
+                if success:
+                    st.success(message)
+                    st.info("You can now sign in with your credentials.")
+                else:
+                    st.error(message)
+
+
+def _render_password_reset_hint():
+    """Display password reset instructions."""
+    st.markdown(
+        """
+        Password reset via email is temporarily unavailable.<br>
+        Please contact **wee235929@gmail.com** with your account details if you need assistance.
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _render_user_info():
     """Render user info and logout button if authenticated."""
     if st.session_state.authenticated and st.session_state.current_user:
         st.markdown(f"""
-        <div style='padding: 0.75rem; background-color: #343541; border-radius: 6px; border: 1px solid #565869; margin-bottom: 1rem;'>
+        <div style='padding: 0.75rem; background-color: #2d2d2d; border-radius: 6px; border: 1px solid #565869; margin-bottom: 1rem;'>
             <div style='color: #8e8ea0; font-size: 0.75rem; margin-bottom: 0.25rem;'>Logged in as</div>
             <div style='color: #ececf1; font-size: 0.9rem; font-weight: 500;'>{st.session_state.current_user['username']}</div>
         </div>
@@ -160,6 +281,7 @@ def _render_user_info():
                 # Save all sessions to disk
                 st.session_state.conversation_storage.save_sessions(st.session_state.sessions)
             
+            # Clear authentication state
             st.session_state.authenticated = False
             st.session_state.current_user = None
             st.session_state.conversation_storage = None
@@ -167,6 +289,8 @@ def _render_user_info():
             st.session_state.sessions = {}
             st.session_state.current_session_id = None
             st.session_state.conversation_persistence_enabled = False
+            # Clear all authentication-related session state
+            st.session_state.sidebar_login_prompt = False
             st.rerun()
 
 
@@ -218,7 +342,7 @@ def _render_role_selection():
     if active_role in available_roles:
         role_name = available_roles[active_role]
         st.markdown(f"""
-        <div style='padding: 0.75rem; background-color: #343541; border-radius: 6px; border: 1px solid #565869; margin-top: 0.5rem;'>
+        <div style='padding: 0.75rem; background-color: #2d2d2d; border-radius: 6px; border: 1px solid #565869; margin-top: 0.5rem;'>
             <div style='color: #8e8ea0; font-size: 0.75rem; margin-bottom: 0.25rem;'>Active Role</div>
             <div style='color: #ececf1; font-size: 0.9rem; font-weight: 500;'>{role_name}</div>
         </div>
@@ -290,7 +414,7 @@ def _render_model_selection():
     current_model_info = next((m for m in ALL_MODELS if m["id"] == current_model), None)
     if current_model_info:
         st.markdown(f"""
-        <div style='padding: 0.75rem; background-color: #343541; border-radius: 6px; border: 1px solid #565869; margin-top: 0.5rem;'>
+        <div style='padding: 0.75rem; background-color: #2d2d2d; border-radius: 6px; border: 1px solid #565869; margin-top: 0.5rem;'>
             <div style='color: #8e8ea0; font-size: 0.75rem; margin-bottom: 0.25rem;'>Active Model</div>
             <div style='color: #ececf1; font-size: 0.9rem; font-weight: 500;'>{current_model_info['name']}</div>
             <div style='color: #8e8ea0; font-size: 0.7rem; margin-top: 0.25rem;'>{current_model_info['provider']}</div>
@@ -467,7 +591,7 @@ def _render_conversation_persistence():
     if persistence_enabled and st.session_state.conversation_storage:
         storage_info = st.session_state.conversation_storage.get_storage_info()
         st.markdown(f"""
-        <div style='padding: 0.5rem; background-color: #343541; border-radius: 6px; border: 1px solid #565869; margin-top: 0.5rem;'>
+        <div style='padding: 0.5rem; background-color: #2d2d2d; border-radius: 6px; border: 1px solid #565869; margin-top: 0.5rem;'>
             <div style='color: #8e8ea0; font-size: 0.7rem; margin-bottom: 0.25rem;'>Storage Usage</div>
             <div style='color: #ececf1; font-size: 0.8rem;'>{storage_info['session_count']} conversations</div>
             <div style='color: #8e8ea0; font-size: 0.7rem; margin-top: 0.25rem;'>{storage_info['storage_size'] / 1024:.1f} KB / {storage_info['max_storage_size'] / 1024:.0f} KB</div>

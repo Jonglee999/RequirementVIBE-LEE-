@@ -47,7 +47,7 @@ def get_custom_css() -> str:
     
     header button:hover,
     [data-testid="stHeader"] button:hover {
-        background-color: #343541 !important;
+        background-color: #2d2d2d !important;
     }
     
     /* Ensure MainMenu is accessible */
@@ -55,9 +55,9 @@ def get_custom_css() -> str:
         visibility: visible !important;
     }
     
-    /* Main app background */
+    /* Main app background - dark gray */
     .stApp {
-        background-color: #343541 !important;
+        background-color: #2d2d2d !important;
     }
     
     /* Main container styling */
@@ -112,13 +112,29 @@ def get_custom_css() -> str:
     }
     
     section[data-testid="stSidebar"] .stButton > button:hover {
-        background-color: #343541;
+        background-color: #2d2d2d;
         border-color: #565869;
     }
     
     section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
-        background-color: #343541;
+        background-color: #2d2d2d;
         border-color: #565869;
+    }
+    
+    /* Sidebar checkboxes */
+    section[data-testid="stSidebar"] .stCheckbox > label > div[data-baseweb="checkbox"] {
+        background-color: #2d2d2d !important;
+        border-color: #565869 !important;
+    }
+    
+    section[data-testid="stSidebar"] .stCheckbox > label > div[data-baseweb="checkbox"]:hover {
+        background-color: #3d3d3d !important;
+        border-color: #6e6f7f !important;
+    }
+    
+    section[data-testid="stSidebar"] .stCheckbox > label > div[data-baseweb="checkbox"][aria-checked="true"] {
+        background-color: #2d2d2d !important;
+        border-color: #10a37f !important;
     }
     
     /* Session management columns - align buttons at the top */
@@ -212,13 +228,13 @@ def get_custom_css() -> str:
     
     /* Chat input styling */
     [data-testid="stChatInput"] {
-        background-color: #40414f;
+        background-color: #2d2d2d;
         border-radius: 12px;
         border: 1px solid #565869;
     }
     
     [data-testid="stChatInput"] textarea {
-        background-color: #40414f !important;
+        background-color: #2d2d2d !important;
         color: #ececf1 !important;
     }
     
@@ -241,7 +257,7 @@ def get_custom_css() -> str:
     }
     
     .stMarkdown code {
-        background-color: #40414f;
+        background-color: #2d2d2d;
         color: #ececf1;
         padding: 0.2rem 0.4rem;
         border-radius: 4px;
@@ -254,7 +270,7 @@ def get_custom_css() -> str:
     
     /* Error message styling */
     .stAlert {
-        background-color: #40414f;
+        background-color: #2d2d2d;
         border-left: 4px solid #ef4444;
     }
     
@@ -312,7 +328,7 @@ def get_custom_css() -> str:
     }
     
     .auth-input {
-        background-color: #343541 !important;
+        background-color: #2d2d2d !important;
         color: #ececf1 !important;
         border: 1px solid #565869 !important;
     }
@@ -357,6 +373,84 @@ def get_custom_css() -> str:
         border-radius: 6px;
         border-left: 4px solid #10a37f;
         margin-bottom: 1rem;
+    }
+    
+    /* Main interface buttons (not in sidebar) */
+    .main .stButton > button,
+    .main button:not([data-testid="stSidebar"] button):not([data-testid="stChatInput"] button) {
+        background-color: #2d2d2d !important;
+        color: #ececf1 !important;
+        border: 1px solid #565869 !important;
+        border-radius: 6px;
+        transition: background-color 0.2s;
+    }
+    
+    .main .stButton > button:hover,
+    .main button:not([data-testid="stSidebar"] button):not([data-testid="stChatInput"] button):hover {
+        background-color: #3d3d3d !important;
+        border-color: #6e6f7f !important;
+    }
+    
+    .main .stButton > button[kind="primary"] {
+        background-color: #2d2d2d !important;
+        border-color: #565869 !important;
+    }
+    
+    .main .stButton > button[kind="primary"]:hover {
+        background-color: #3d3d3d !important;
+    }
+    
+    /* Checkboxes in main interface */
+    .main .stCheckbox > label,
+    .main .stCheckbox > div {
+        color: #ececf1 !important;
+    }
+    
+    .main .stCheckbox > label > div[data-baseweb="checkbox"] {
+        background-color: #2d2d2d !important;
+        border-color: #565869 !important;
+    }
+    
+    .main .stCheckbox > label > div[data-baseweb="checkbox"]:hover {
+        background-color: #3d3d3d !important;
+        border-color: #6e6f7f !important;
+    }
+    
+    .main .stCheckbox > label > div[data-baseweb="checkbox"][aria-checked="true"] {
+        background-color: #2d2d2d !important;
+        border-color: #10a37f !important;
+    }
+    
+    /* Radio buttons in main interface */
+    .main .stRadio > label,
+    .main .stRadio > div {
+        color: #ececf1 !important;
+    }
+    
+    .main .stRadio > label > div[data-baseweb="radio"] {
+        background-color: #2d2d2d !important;
+        border-color: #565869 !important;
+    }
+    
+    /* Select boxes and other form elements */
+    .main .stSelectbox > div > div,
+    .main .stTextInput > div > div > input,
+    .main .stTextArea > div > div > textarea {
+        background-color: #2d2d2d !important;
+        color: #ececf1 !important;
+        border-color: #565869 !important;
+    }
+    
+    /* Download buttons */
+    .main .stDownloadButton > button {
+        background-color: #2d2d2d !important;
+        color: #ececf1 !important;
+        border: 1px solid #565869 !important;
+    }
+    
+    .main .stDownloadButton > button:hover {
+        background-color: #3d3d3d !important;
+        border-color: #6e6f7f !important;
     }
 </style>
 """

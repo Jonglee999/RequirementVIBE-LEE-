@@ -24,7 +24,7 @@ def initialize_session_state():
     - Memory management (memory)
     - Authentication (authenticated, current_user, auth_manager)
     - Conversation storage (conversation_storage, conversation_persistence_enabled)
-    - UI state (pending_requirement, show_register)
+    - UI state (pending_requirement)
     """
     # Session Management State
     # sessions: Dictionary mapping session_id -> session data (messages, title, model, created_at)
@@ -85,12 +85,9 @@ def initialize_session_state():
     # pending_requirement: Optional requirement data waiting to be saved after AI response
     if "pending_requirement" not in st.session_state:
         st.session_state.pending_requirement = None
-    # show_register: Boolean flag to toggle between login and registration pages
-    if "show_register" not in st.session_state:
-        st.session_state.show_register = False
-    # show_password_reset: Boolean flag to toggle password reset page
-    if "show_password_reset" not in st.session_state:
-        st.session_state.show_password_reset = False
+    # sidebar_login_prompt: Whether to highlight login prompt in sidebar
+    if "sidebar_login_prompt" not in st.session_state:
+        st.session_state.sidebar_login_prompt = False
     
     # File Upload State
     # document_processing_results: Results from processing uploaded documents

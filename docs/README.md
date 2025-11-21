@@ -1,6 +1,6 @@
 # ReqVibe - AI Requirements Analyst
 
-A Streamlit application that uses DeepSeek API to analyze and refine software requirements.
+A Streamlit application that uses a centralized LLM gateway to orchestrate multiple OpenAI-compatible providers (DeepSeek, GPT-4o, Claude 3, Gemini 1.5, Grok, etc.) for requirement analysis.
 
 ## Character Card
 
@@ -23,34 +23,80 @@ See `config/roles/analyst.json` for the default character definition.
 pip install -r requirements.txt
 ```
 
-2. Set your DeepSeek API key as an environment variable:
-
-**Windows (PowerShell)** - Run this command:
-```powershell
-$env:DEEPSEEK_API_KEY="YOUR API KEY"
-```
-
-**Windows (Command Prompt)** - Run this command:
-```cmd
-set DEEPSEEK_API_KEY=YOUR_API_KEY
-```
-
-**Linux/Mac** - Run this command:
-```bash
-export DEEPSEEK_API_KEY=YOUR_API_KEY
-```
-
-**Note:** The environment variable is set only for the current terminal session. To make it permanent, you can:
-- Add it to your system environment variables (Windows)
-- Add it to your `~/.bashrc` or `~/.zshrc` file (Linux/Mac)
-
-## Running the App
-
+2. Set the required environment variables (see the section below for details)
+3. Launch the Streamlit app:
 ```bash
 streamlit run app.py
 ```
 
 The app will open in your default web browser.
+
+## Environment Variables
+
+All configuration is read from a `.env` file in the project root (automatically loaded) or from your shell.
+
+### Required
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `CENTRALIZED_LLM_API_KEY` | API key for the centralized LLM gateway that proxies DeepSeek/OpenAI-compatible providers | `CENTRALIZED_LLM_API_KEY=sk-xxxxx` |
+| `UNSTRUCTURED_API_KEY` | API key for the Unstructured.io document processing service | `UNSTRUCTURED_API_KEY=uzzzzz` |
+
+### Optional (enable only what you need)
+
+| Variable | Description |
+|----------|-------------|
+| `UNSTRUCTURED_API_URL` | Custom Unstructured endpoint, defaults to `https://api.unstructured.io/general/v0/general` |
+| `RESEND_API_KEY` | Enables transactional emails (password reset, verification) |
+| `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `LANGSMITH_ENDPOINT` | Enable LangSmith observability |
+| `VOICE_TRANSCRIBE_MODEL`, `VOICE_TRANSCRIBE_LANGUAGE`, `VOICE_TRANSCRIBE_TEMPERATURE` | Override default Whisper transcription settings |
+
+### `.env` template
+
+```
+# LLM Gateway
+CENTRALIZED_LLM_API_KEY=your_key
+
+# Document processing
+UNSTRUCTURED_API_KEY=your_key
+# UNSTRUCTURED_API_URL=https://api.unstructured.io/general/v0/general
+
+# Optional services
+# RESEND_API_KEY=your_resend_key
+# LANGSMITH_TRACING=true
+# LANGSMITH_API_KEY=your_langsmith_key
+
+# Voice transcription tweaks (optional)
+# VOICE_TRANSCRIBE_MODEL=base
+# VOICE_TRANSCRIBE_LANGUAGE=en
+# VOICE_TRANSCRIBE_TEMPERATURE=0.1
+```
+
+> **Never commit the `.env` file.** It is already excluded by `.gitignore`.
+
+To set variables manually without `.env`, use your shell’s syntax (`$env:VAR="value"` in PowerShell, `export VAR=value` in Bash/Zsh, etc.).
+
+## Memory Architecture Snapshot
+
+ReqVIBE uses a layered memory model optimised for Streamlit reruns:
+
+1. **`ShortTermMemory` (`core/models/memory.py`)**  
+   - Maintains the active chat transcript, extracted requirements, and token usage.  
+   - Provides `get_context_for_api()` to enforce token budgets before hitting the LLM.
+
+2. **Streamlit Session State (`utils/state_manager.py`)**  
+   - Stores UI selections (role, model), authentication state, and current conversation metadata.  
+   - Keeps an instance of `ShortTermMemory` per session to survive reruns without re-fetching data.
+
+3. **Persistent Storage (`domain/conversations/service.py`)**  
+   - Saves the last N conversations per user (JSON on disk) with per-user size limits.  
+   - Uses signatures to avoid redundant writes and sorts sessions by `created_at` during truncation.
+
+4. **Caching**  
+   - Role cards and sidebar icons are cached using `st.cache_data` to avoid repeated disk IO.  
+   - Whisper models are cached with `@st.cache_resource`, so the base model is loaded once per session.
+
+This layered approach keeps the UI responsive while providing durability for authenticated users.
 
 ## Usage
 
@@ -61,10 +107,10 @@ The app will open in your default web browser.
 
 ## Requirements
 
-- Python 3.7+
-- DeepSeek API key
-- streamlit
-- openai (required for DeepSeek API - DeepSeek uses OpenAI-compatible SDK)
+- Python 3.9+ (recommended)
+- Centralized LLM API key (OpenAI-compatible; DeepSeek/Grok/GPT/Claude/Gemini are all supported)
+- `streamlit`
+- `openai` (client used for all OpenAI-compatible gateways)
 
 ## Security Note
 
@@ -79,12 +125,13 @@ To deploy this app to Streamlit Cloud:
 3. Sign in with your GitHub account
 4. Click "New app" and select your repository
 5. Set the main file path to: `app.py`
-6. Add your `DEEPSEEK_API_KEY` in the Secrets section
+6. Add your required secrets (at minimum `CENTRALIZED_LLM_API_KEY`, plus anything like `UNSTRUCTURED_API_KEY`)
 7. Click "Deploy"
 
-**Important:** Set the `DEEPSEEK_API_KEY` in Streamlit Cloud Secrets (not in the code):
+**Important:** Set secrets in Streamlit Cloud (not in the code), for example:
 ```
-DEEPSEEK_API_KEY = "YOUR API KEY"
+CENTRALIZED_LLM_API_KEY = "YOUR_GATEWAY_KEY"
+UNSTRUCTURED_API_KEY = "YOUR_DOC_KEY"
 ```
 
 For detailed deployment instructions, see [DEPLOYMENT.md](docs/DEPLOYMENT.md).
@@ -102,16 +149,16 @@ For detailed deployment instructions, see [DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Extending with Other API Providers
 
-This project is designed to work with OpenAI-compatible APIs (like DeepSeek). However, you can easily extend it to support other API providers such as OpenAI, Anthropic Claude, Google Gemini, or any custom API.
+This project is designed to work with any OpenAI-compatible API via the centralized gateway (`config/models.py`). Out of the box it ships with presets for DeepSeek, OpenAI, Anthropic Claude, Grok, and Google Gemini, and you can add more by editing the model registry.
 
 ### Architecture Overview
 
 The project uses the OpenAI SDK pattern, which is compatible with many providers:
-- **DeepSeek**: Uses OpenAI-compatible API (current default)
+- **DeepSeek / Grok / Perplexity**: OpenAI-compatible endpoints (configured via centralized gateway)
 - **OpenAI**: Native OpenAI API
-- **Anthropic**: Requires `anthropic` SDK
-- **Google Gemini**: Requires `google-generativeai` SDK
-- **Other providers**: Many support OpenAI-compatible endpoints
+- **Anthropic**: Requires `anthropic` SDK (add to requirements if used directly)
+- **Google Gemini**: Requires `google-generativeai` SDK (add when needed)
+- **Other providers**: Many expose OpenAI-compatible endpoints; register them in `config/models/roles`.
 
 ### Step-by-Step Guide to Add a New API Provider
 
@@ -224,7 +271,7 @@ You need to modify three functions in `app.py`:
 
 ##### A. Main Chat Function (around line 850)
 
-**Current (DeepSeek/OpenAI-compatible):**
+**Current (OpenAI-compatible default):**
 ```python
 response = client.chat.completions.create(
     model="deepseek-chat",
@@ -403,12 +450,12 @@ GOOGLE_API_KEY = "your_key_here"
 
 #### 6. Update Helper Functions
 
-The current `_get_api_key_from_secrets()` function only handles `DEEPSEEK_API_KEY`. To support multiple providers, you can either:
+The helper `_get_api_key_from_secrets()` currently defaults to `CENTRALIZED_LLM_API_KEY`. To support per-provider secrets, you can either:
 
 **Option A: Modify the function to accept a parameter (recommended):**
 
 ```python
-def _get_api_key_from_secrets(key_name="DEEPSEEK_API_KEY"):
+def _get_api_key_from_secrets(key_name="CENTRALIZED_LLM_API_KEY"):
     """Safely get API key from Streamlit secrets."""
     try:
         api_key = st.secrets.get(key_name, None)

@@ -83,7 +83,6 @@ import time
 
 # Presentation Layer (UI)
 from presentation.styles import apply_styles
-from presentation.pages.auth import show_login_page, show_register_page, show_password_reset_page
 from presentation.components.sidebar import render_sidebar
 
 # Domain Services
@@ -144,8 +143,6 @@ def parse_model_response(response):
     except (AttributeError, IndexError, KeyError, TypeError):
         return ""
 
-# Config (models are used in sidebar component, not directly in app.py)
-
 # ----------------------------------------------------------------------
 # Page Configuration
 # ----------------------------------------------------------------------
@@ -183,20 +180,6 @@ apply_styles()
 # Initialize all session state variables with default values
 initialize_session_state()
 
-# Note: Authentication and session management functions have been moved to:
-# - ui/pages/auth.py: show_login_page(), show_register_page()
-# - services/session_service.py: create_new_session(), get_current_session(), update_session_title()
-
-# ----------------------------------------------------------------------
-# SRS Generation Function
-# ----------------------------------------------------------------------
-# This function generates IEEE 830 Software Requirements Specification documents
-# by analyzing the assistant's responses from the conversation and formatting
-# them according to the IEEE 830 standard structure.
-
-# Note: SRS generation function has been moved to domain/documents/srs.py
-# Use generate_ieee830_srs_from_conversation() from domain.documents.srs module
-
 # ----------------------------------------------------------------------
 # Sidebar UI - Session and Model Management
 # ----------------------------------------------------------------------
@@ -209,196 +192,6 @@ initialize_session_state()
 # 5. Conversation persistence settings
 
 render_sidebar()
-
-# ----------------------------------------------------------------------
-# Sidebar Toggle Button (Custom JavaScript)
-# ----------------------------------------------------------------------
-# Custom JavaScript button in the top-left corner to toggle sidebar visibility
-# This ensures users can always access the sidebar even if it's collapsed
-st.markdown("""
-<div id="sidebarToggleContainer" style='position: fixed; top: 10px; left: 10px; z-index: 9999;'>
-    <button id="sidebarToggleBtn" style='
-        background-color: #202123;
-        color: #ececf1;
-        border: 1px solid #565869;
-        border-radius: 6px;
-        padding: 0.6rem 1rem;
-        cursor: pointer;
-        font-size: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-        transition: all 0.2s;
-        font-weight: 500;
-    '>
-        <span style='font-size: 1.2rem;'>☰</span> <span>Menu</span>
-    </button>
-</div>
-
-<script>
-(function() {
-    const btn = document.getElementById('sidebarToggleBtn');
-    if (!btn) return;
-    
-    function findSidebarToggle() {
-        const selectors = [
-            'button[data-testid="baseButton-header"]',
-            '[data-testid="stHeader"] button',
-            '[data-testid="stHeader"] button:first-child',
-            'button[kind="header"]',
-            '.stApp > header button',
-            'header button:first-child'
-        ];
-        
-        for (const selector of selectors) {
-            const buttons = document.querySelectorAll(selector);
-            for (const button of buttons) {
-                if (button.offsetWidth > 0 && button.offsetHeight > 0) {
-                    return button;
-                }
-            }
-        }
-        
-        const header = document.querySelector('[data-testid="stHeader"]') || 
-                       document.querySelector('header') ||
-                       document.querySelector('.stApp > div:first-child');
-        if (header) {
-            const buttons = header.querySelectorAll('button');
-            if (buttons.length > 0) {
-                return buttons[0];
-            }
-        }
-        
-        return null;
-    }
-    
-    function toggleSidebar() {
-        let toggleBtn = findSidebarToggle();
-        if (toggleBtn) {
-            try {
-                const clickEvent = new MouseEvent('click', {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true,
-                    buttons: 1
-                });
-                toggleBtn.dispatchEvent(clickEvent);
-                
-                if (typeof toggleBtn.click === 'function') {
-                    toggleBtn.click();
-                }
-                
-                setTimeout(function() {
-                    const sidebar = document.querySelector('section[data-testid="stSidebar"]');
-                    if (sidebar) {
-                        const isExpanded = sidebar.getAttribute('aria-expanded') === 'true' || sidebar.offsetWidth > 100;
-                        if (!isExpanded) {
-                            expandSidebarDirectly();
-                        }
-                    }
-                }, 200);
-                return;
-            } catch (e) {
-                console.log('Error clicking native toggle:', e);
-            }
-        }
-        
-        expandSidebarDirectly();
-    }
-    
-    function expandSidebarDirectly() {
-        const sidebar = document.querySelector('section[data-testid="stSidebar"]');
-        if (!sidebar) return;
-        
-        const currentState = sidebar.getAttribute('aria-expanded');
-        const computedStyle = window.getComputedStyle(sidebar);
-        const isVisible = computedStyle.display !== 'none' && sidebar.offsetWidth > 50;
-        
-        if (currentState !== 'true' || !isVisible) {
-            sidebar.setAttribute('aria-expanded', 'true');
-            sidebar.style.setProperty('display', 'flex', 'important');
-            sidebar.style.setProperty('visibility', 'visible', 'important');
-            sidebar.style.setProperty('transform', 'translateX(0)', 'important');
-            sidebar.style.setProperty('opacity', '1', 'important');
-            
-            const sidebarContent = sidebar.querySelector('[data-testid="stSidebarContent"]');
-            if (sidebarContent) {
-                sidebarContent.style.setProperty('display', 'block', 'important');
-                sidebarContent.style.setProperty('visibility', 'visible', 'important');
-            }
-            
-            window.dispatchEvent(new Event('resize'));
-            setTimeout(function() {
-                window.dispatchEvent(new Event('resize'));
-            }, 100);
-        }
-    }
-    
-    btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleSidebar();
-    });
-    
-    btn.addEventListener('mouseenter', function() {
-        this.style.backgroundColor = '#343541';
-    });
-    
-    btn.addEventListener('mouseleave', function() {
-        this.style.backgroundColor = '#202123';
-    });
-})();
-</script>
-
-<style>
-#sidebarToggleContainer {
-    position: fixed !important;
-    top: 10px !important;
-    left: 10px !important;
-    z-index: 9999 !important;
-    pointer-events: auto !important;
-}
-
-#sidebarToggleBtn {
-    position: relative !important;
-    z-index: 10000 !important;
-    pointer-events: auto !important;
-}
-
-#sidebarToggleBtn:hover {
-    background-color: #343541 !important;
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-}
-
-section[data-testid="stSidebar"] {
-    z-index: 1000 !important;
-}
-
-@media (max-width: 768px) {
-    .main .block-container {
-        padding-top: 4rem;
-    }
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ----------------------------------------------------------------------
-# Authentication Check
-# ----------------------------------------------------------------------
-# Check if user is authenticated before showing the main application
-# If not authenticated, show login/registration page
-
-if not st.session_state.authenticated:
-    # Show registration, password reset, or login page based on state
-    if st.session_state.get("show_password_reset", False):
-        show_password_reset_page()
-    elif st.session_state.get("show_register", False):
-        show_register_page()
-    else:
-        show_login_page()
-    st.stop()  # Stop execution here - don't show main app
 
 # Ensure conversation storage is initialized for authenticated user
 if st.session_state.authenticated and st.session_state.current_user and st.session_state.conversation_storage is None:
@@ -446,6 +239,12 @@ user_input = st.chat_input("Ask for requirement analysis...")
 
 # Get the current active session
 current_session = get_current_session()
+
+# Prevent unauthenticated users from sending chat messages
+if user_input and not st.session_state.authenticated:
+    st.session_state.sidebar_login_prompt = True
+    st.warning("Please log in via the sidebar before starting a conversation.")
+    user_input = None
 
 # Synchronize memory with session storage on page load
 if current_session["messages"] and st.session_state.memory.get_history_length() == 0:
